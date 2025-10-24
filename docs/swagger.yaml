@@ -1,0 +1,149 @@
+basePath: /api/sbom
+definitions:
+  v1.GitHubSBOMRequest:
+    properties:
+      branch:
+        type: string
+      file:
+        description: e.g package.json, go.mod, requirements.txt...
+        type: string
+      owner:
+        type: string
+      project_name:
+        type: string
+      repo:
+        type: string
+    type: object
+host: localhost:8002
+info:
+  contact: {}
+  description: API documentation for SBOM microservice
+  title: MyESI SBOM Service API
+  version: "1.0"
+paths:
+  /{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a single SBOM by its ID
+      parameters:
+      - description: SBOM ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get SBOM by ID
+      tags:
+      - SBOM
+  /github:
+    post:
+      consumes:
+      - application/json
+      description: Fetch a manifest file from GitHub using REST API and generate a
+        SBOM
+      parameters:
+      - description: GitHub repo and file info
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.GitHubSBOMRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Upload a manifest from a GitHub repository to generate SBOM
+      tags:
+      - SBOM
+  /list:
+    get:
+      consumes:
+      - application/json
+      description: Get list of SBOMs filtered by project name
+      parameters:
+      - description: Project Name
+        in: query
+        name: project_name
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: List SBOMs
+      tags:
+      - SBOM
+  /upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a manifest file and generate an SBOM
+      parameters:
+      - description: Project Name
+        in: formData
+        name: project_name
+        required: true
+        type: string
+      - description: Manifest file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Upload a manifest file to generate SBOM
+      tags:
+      - SBOM
+swagger: "2.0"
