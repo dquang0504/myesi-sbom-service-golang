@@ -13,10 +13,10 @@ import (
 
 var supportedManifests = map[string]struct{}{
 	"package-lock.json": {},
-	"go.mod": {},
-	"requirements.txt": {},
-	"pom.xml": {},
-	"build.gradle": {},
+	"go.mod":            {},
+	"requirements.txt":  {},
+	"pom.xml":           {},
+	"build.gradle":      {},
 }
 
 type SBOMResult struct {
@@ -60,8 +60,7 @@ func ParseManifest(ctx context.Context, projectName, manifestName string, manife
 	}, nil
 }
 
-func IsSupportedManifest(filename string) bool{
+func IsSupportedManifest(filename string) bool {
 	_, ok := supportedManifests[filepath.Base(filename)]
 	return ok
 }
-

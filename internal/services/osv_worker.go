@@ -11,14 +11,14 @@ import (
 
 const OSV_URL = "https://api.osv.dev/v1/querybatch"
 
-func EnqueueOSVScan(sbomID string){
+func EnqueueOSVScan(sbomID string) {
 	go scanVulnerabilities(sbomID)
 }
 
 func scanVulnerabilities(sbomID string) {
 	// Load SBOM from DB
 	sbom, err := GetSBOM(context.Background(), db.Conn, sbomID)
-	if err != nil{
+	if err != nil {
 		log.Println("OSV scan failed:", err)
 		return
 	}
@@ -26,13 +26,13 @@ func scanVulnerabilities(sbomID string) {
 	json.Unmarshal(sbom.Sbom, &comps)
 
 	queries := []map[string]map[string]string{}
-	for _, c := range comps{
+	for _, c := range comps {
 		queries = append(queries, map[string]map[string]string{"package": {"name": c["name"], "version": c["version"]}})
 	}
 	payload, _ := json.Marshal(map[string]interface{}{"queries": queries})
 
 	resp, err := http.Post(OSV_URL, "application/json", bytes.NewReader(payload))
-	if err != nil{
+	if err != nil {
 		log.Println("OSV API error: ", err)
 		return
 	}

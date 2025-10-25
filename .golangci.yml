@@ -1,0 +1,61 @@
+run:
+  issues-exit-code: 0
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - "models"     # Bỏ qua toàn bộ generated code
+    - "vendor"     # Nếu có vendor
+  skip-files:
+    - ".*\\.pb\\.go"
+    - ".*\\.gen\\.go"
+
+linters:
+  enable:
+    - govet
+    - gofmt
+    - goimports
+    - staticcheck
+    - revive
+    - errcheck
+    - unconvert
+    - gocyclo
+    - goconst
+    - gosimple
+    - unused
+
+linters-settings:
+  revive:
+    ignore:
+      - "should have a package comment"  # Ignore revive package comment
+  gocritic:
+    enabled-checks:
+      - range-loop-reflect
+      - prealloc
+      - deep-expr
+  goconst:
+    min-len: 3
+  goimports:
+    local-prefixes: "myesi-sbom-service-golang"
+
+issues:
+  exclude-use-default: false
+  # Ignore typecheck errors in generated code
+  exclude-rules:
+    - path: "models/.*"
+      linters:
+        - typecheck
+        - staticcheck
+    - linters:
+        - revive
+      text: "should have a package comment"
+
+output:
+  # Sử dụng định dạng text đơn giản
+  format: colored-line-number
+  sort-order:
+    - severity
+    - path
+  show-ignored: false
+  print-issued-lines: true
+  print-linter-name: true
+

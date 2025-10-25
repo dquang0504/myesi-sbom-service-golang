@@ -3,19 +3,19 @@ package db
 import (
 	"context"
 	"database/sql"
-	"log"
 	_ "github.com/lib/pq"
+	"log"
 )
 
 var Conn *sql.DB
 
-func InitPostgres(dns string){
+func InitPostgres(dns string) {
 	var err error
-	Conn, err = sql.Open("postgres",dns)
-	if err != nil{
+	Conn, err = sql.Open("postgres", dns)
+	if err != nil {
 		log.Fatalf("DB Connection error: %v", err)
 	}
-	if err = Conn.PingContext(context.Background()); err != nil{
+	if err = Conn.PingContext(context.Background()); err != nil {
 		log.Fatalf("DB ping failed: %v", err)
 	}
 	log.Println("PostgreSQL connected")

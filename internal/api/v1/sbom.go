@@ -2,13 +2,13 @@ package v1
 
 import (
 	"context"
+	fiber "github.com/gofiber/fiber/v2"
 	"io"
 	"log"
+	"myesi-sbom-service-golang/internal/config"
 	"myesi-sbom-service-golang/internal/db"
 	"myesi-sbom-service-golang/internal/services"
 	"net/http"
-	"myesi-sbom-service-golang/internal/config"
-	"github.com/gofiber/fiber/v2"
 )
 
 func RegisterSBOMRoutes(app *fiber.App) {
@@ -16,7 +16,7 @@ func RegisterSBOMRoutes(app *fiber.App) {
 	r.Post("/upload", uploadSBOM)
 	r.Get("/list", listSBOMs)
 	r.Get("/:id", getSBOM)
-	r.Post("/github",uploadSBOMFromGitHub)
+	r.Post("/github", uploadSBOMFromGitHub)
 }
 
 // uploadSBOM godoc
@@ -39,8 +39,8 @@ func uploadSBOM(c *fiber.Ctx) error {
 
 	// Check for supported manifest types
 	if !services.IsSupportedManifest(file.Filename) {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "unsupported file type"})
-    }
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "unsupported file type"})
+	}
 
 	f, err := file.Open()
 	if err != nil {
@@ -126,11 +126,11 @@ func getSBOM(c *fiber.Ctx) error {
 	return c.JSON(sbom)
 }
 
-type GitHubSBOMRequest struct{
-	Owner string `json:"owner"`
-	Repo string `json:"repo"`
-	Branch string `json:"branch"`
-	File string `json:"file"` //e.g package.json, go.mod, requirements.txt...
+type GitHubSBOMRequest struct {
+	Owner   string `json:"owner"`
+	Repo    string `json:"repo"`
+	Branch  string `json:"branch"`
+	File    string `json:"file"` //e.g package.json, go.mod, requirements.txt...
 	Project string `json:"project_name"`
 }
 
@@ -145,46 +145,46 @@ type GitHubSBOMRequest struct{
 // @Failure 400 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /github [post]
-func uploadSBOMFromGitHub(c *fiber.Ctx) error{
+func uploadSBOMFromGitHub(c *fiber.Ctx) error {
 	var req GitHubSBOMRequest
-	if err := c.BodyParser(&req); err != nil{
+	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 	}
 
-	if !services.IsSupportedManifest(req.File){
+	if !services.IsSupportedManifest(req.File) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "unsupported file type"})
 	}
 
-	if config.LoadConfig().Token == ""{
+	if config.LoadConfig().Token == "" {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "GITHUB_TOKEN not set"})
 	}
 
 	content, err := services.FetchManifestFromGitHub(c.Context(), req.Owner, req.Repo, req.File, req.Branch, config.LoadConfig().Token)
-	if err != nil{
+	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	sbomResult, err := services.ParseManifest(c.Context(), req.Project, req.File, content)
 	if err != nil {
-        return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
-    }
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
 
 	summaryJSON := []byte("{}")
 	url, err := services.UploadSBOMJSON(c.Context(), db.Conn, req.Project, sbomResult.Data, summaryJSON)
 	if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-    }
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
 
 	id, err := services.CreateSBOM(c.Context(), db.Conn, req.Project, sbomResult.Data, "github", url)
 	if err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
-    }
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
 
 	services.EnqueueOSVScan(id)
 	return c.JSON(fiber.Map{
-		"id": id,
+		"id":           id,
 		"project_name": req.Project,
-		"object_url": url,
-		"message": "SBOM generated from GitHub manifest and queued for vulnerability scan",
+		"object_url":   url,
+		"message":      "SBOM generated from GitHub manifest and queued for vulnerability scan",
 	})
 }

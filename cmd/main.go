@@ -1,21 +1,22 @@
 package main
 
 import (
+	fiber "github.com/gofiber/fiber/v2"
+	fiberSwagger "github.com/gofiber/swagger"
 	"log"
+	_ "myesi-sbom-service-golang/docs" // <— import docs package
 	v1 "myesi-sbom-service-golang/internal/api/v1"
 	"myesi-sbom-service-golang/internal/config"
 	"myesi-sbom-service-golang/internal/db"
-	"github.com/gofiber/fiber/v2"
-    _ "myesi-sbom-service-golang/docs" // <— import docs package
-	fiberSwagger "github.com/gofiber/swagger"
 )
+
 // @title MyESI SBOM Service API
 // @version 1.0
 // @description API documentation for SBOM microservice
 // @host localhost:8002
 // @BasePath /api/sbom
 
-func main(){
+func main() {
 	cfg := config.LoadConfig()
 	db.InitPostgres(cfg.DatabaseURL)
 
