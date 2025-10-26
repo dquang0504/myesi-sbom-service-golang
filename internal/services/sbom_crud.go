@@ -13,15 +13,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreateSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte, source, objectURL string) (string, error) {
+func CreateSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte, source, objectURL string) (string, string, error) {
 	id := uuid.New().String()
 
 	summary, err := ParseSBOMSummary(sbomJSON)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse SBOM summary: %w", err)
+		return "", "", fmt.Errorf("failed to parse SBOM summary: %w", err)
 	}
 	summaryBytes, _ := json.Marshal(summary)
-	fmt.Println(summaryBytes)
 
 	sbom := &models.Sbom{
 		ID:          id,
@@ -32,7 +31,29 @@ func CreateSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte
 		ObjectURL:   null.StringFrom(objectURL),
 	}
 	err = sbom.Insert(ctx, db, boil.Infer())
-	return sbom.ID, err
+	return sbom.ID, "create", err
+}
+
+func UpsertSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte, source, objectURL string) (string, string, error) {
+	//Generate summary from sbomjson
+	summary, err := ParseSBOMSummary(sbomJSON)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse SBOM summary: %w", err)
+	}
+	summaryBytes, _ := json.Marshal(summary)
+
+	//Check existing SBOM
+	existing, err := models.Sboms(qm.Where("project_name=?", project)).One(ctx, db)
+	if err == nil && existing != nil {
+		//Update SBOM JSON, summary, object URL, last_updated timestamp
+		existing.Sbom = sbomJSON
+		existing.ObjectURL = null.StringFrom(objectURL)
+		existing.Summary = null.JSONFrom(summaryBytes)
+		_, err := existing.Update(ctx, db, boil.Infer())
+		return existing.ID, "update", err
+	}
+	//Insert if not found
+	return CreateSBOM(ctx, db, project, sbomJSON, source, objectURL)
 }
 
 func GetSBOM(ctx context.Context, db *sql.DB, id string) (*models.Sbom, error) {

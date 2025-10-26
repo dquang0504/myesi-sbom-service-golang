@@ -35,16 +35,16 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      # ---- Install golangci-lint ----
-      - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $HOME/go/bin v1.57.0
-          echo "$HOME/go/bin" >> $GITHUB_PATH
+      - name: Install goimports
+        run: go install golang.org/x/tools/cmd/goimports@latest
 
-      # ---- Run linter ----
-      - name: Run golangci-lint
+      - name: Format code
         run: |
-          golangci-lint run --timeout 5m --fix || true
+          go fmt ./...
+          goimports -w .
+
+      - name: Vet code
+        run: go vet ./...
 
       # ---- Run tests ----
       - name: Run tests

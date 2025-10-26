@@ -2,13 +2,13 @@ package v1
 
 import (
 	"context"
-	fiber "github.com/gofiber/fiber/v2"
 	"io"
-	"log"
 	"myesi-sbom-service-golang/internal/config"
 	"myesi-sbom-service-golang/internal/db"
 	"myesi-sbom-service-golang/internal/services"
 	"net/http"
+
+	fiber "github.com/gofiber/fiber/v2"
 )
 
 func RegisterSBOMRoutes(app *fiber.App) {
@@ -59,24 +59,25 @@ func uploadSBOM(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// summary có thể để trống hoặc sinh sau
+	// summary can be left for later uses
 	summaryJSON := []byte(`{}`)
 
-	// Upload SBOM JSON lên S3 hoặc fallback về DB/local storage
+	// Upload SBOM JSON onto S3 or fallback to DB/local storage
 	url, err := services.UploadSBOMJSON(c.Context(), db.Conn, projectName, sbomResult.Data, summaryJSON)
 	if err != nil {
-		log.Println(sbomResult.Data)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Ghi record SBOM vào DB
-	id, err := services.CreateSBOM(context.Background(), db.Conn, projectName, sbomResult.Data, "upload", url)
+	// Write SBOM record into DB
+	id, operation, err := services.UpsertSBOM(context.Background(), db.Conn, projectName, sbomResult.Data, "upload", url)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// Đưa vào queue quét lỗ hổng
-	services.EnqueueOSVScan(id)
+	//Fetch components from SBOM JSON
+	comps := services.ExtractComponents(sbomResult.Data)
+	// Publish event onto Kafka
+	services.PublishSBOMEvent(id, projectName, comps, operation)
 
 	return c.JSON(fiber.Map{
 		"id":           id,
@@ -175,12 +176,17 @@ func uploadSBOMFromGitHub(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	id, err := services.CreateSBOM(c.Context(), db.Conn, req.Project, sbomResult.Data, "github", url)
+	id, operation, err := services.UpsertSBOM(c.Context(), db.Conn, req.Project, sbomResult.Data, "github", url)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	services.EnqueueOSVScan(id)
+	//Fetch components from SBOM JSON
+	comps := services.ExtractComponents(sbomResult.Data)
+
+	// Publish event onto Kafka
+	services.PublishSBOMEvent(id, req.Project, comps, operation)
+
 	return c.JSON(fiber.Map{
 		"id":           id,
 		"project_name": req.Project,
