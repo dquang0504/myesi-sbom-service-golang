@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/joho/godotenv"
 	"log"
 	"os"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -14,6 +15,7 @@ type Config struct {
 	S3AccessKey string
 	S3SecretKey string
 	Token       string
+	KafkaBroker string
 	ApiPrefix   string
 }
 
@@ -27,6 +29,7 @@ func LoadConfig() *Config {
 		S3AccessKey: os.Getenv("S3_ACCESS_KEY"),
 		S3SecretKey: os.Getenv("S3_SECRET_KEY"),
 		Token:       os.Getenv("GITHUB_TOKEN"),
+		KafkaBroker: os.Getenv("KAFKA_BROKER"),
 		ApiPrefix:   "/api/sbom",
 	}
 	if cfg.DatabaseURL == "" {
