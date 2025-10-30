@@ -106,6 +106,54 @@
                 }
             }
         },
+        "/recent": {
+            "get": {
+                "description": "Get recent SBOM uploads with optional project filter",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "SBOM"
+                ],
+                "summary": "Recent SBOM uploads",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Project Name",
+                        "name": "project_name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/upload": {
             "post": {
                 "description": "Upload a manifest file and generate an SBOM",

@@ -2,11 +2,14 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"myesi-sbom-service-golang/internal/config"
 	"myesi-sbom-service-golang/internal/db"
 	"myesi-sbom-service-golang/internal/services"
 	"net/http"
+	"strconv"
 
 	fiber "github.com/gofiber/fiber/v2"
 )
@@ -15,8 +18,10 @@ func RegisterSBOMRoutes(app *fiber.App) {
 	r := app.Group("/api/sbom")
 	r.Post("/upload", uploadSBOM)
 	r.Get("/list", listSBOMs)
-	r.Get("/:id", getSBOM)
 	r.Post("/github", uploadSBOMFromGitHub)
+	r.Get("/recent", recentSBOMs)
+	r.Get("/:id", getSBOM)
+
 }
 
 // uploadSBOM godoc
@@ -193,4 +198,72 @@ func uploadSBOMFromGitHub(c *fiber.Ctx) error {
 		"object_url":   url,
 		"message":      "SBOM generated from GitHub manifest and queued for vulnerability scan",
 	})
+}
+
+// recentSBOMs godoc
+// @Summary Recent SBOM uploads
+// @Description Get recent SBOM uploads with optional project filter
+// @Tags SBOM
+// @Accept json
+// @Produce json
+// @Param project_name query string false "Project Name"
+// @Param limit query int false "Limit"
+// @Success 200 {array} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /recent [get]
+func recentSBOMs(c *fiber.Ctx) error {
+	project := c.Query("project_name")
+	limit := c.QueryInt("limit", 20)
+
+	query := `
+		SELECT id, project_name, object_url, sbom, created_at, source
+		FROM sboms
+		WHERE $1 = '' OR project_name = $1
+		ORDER BY created_at DESC
+		LIMIT ` + strconv.Itoa(limit) // bind trực tiếp limit
+	rows, err := db.Conn.QueryContext(c.Context(), query, project)
+	if err != nil {
+		fmt.Println("Here right?: ", project, err.Error())
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	defer rows.Close()
+
+	type SBOMItem struct {
+		ID          string `json:"id"`
+		ProjectName string `json:"project_name"`
+		ObjectURL   string `json:"object_url"`
+		CreatedAt   string `json:"created_at"`
+		Source      string `json:"source"`
+		Findings    int    `json:"findings"`
+	}
+
+	var list []SBOMItem
+	for rows.Next() {
+		var id, projectName, objectURL, source string
+		var createdAt string
+		var sbomJSON []byte
+		if err := rows.Scan(&id, &projectName, &objectURL, &sbomJSON, &createdAt, &source); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		findings := 0
+		// sbomJSON có thể là map với key "components"
+		var sbomData map[string]interface{}
+		if err := json.Unmarshal(sbomJSON, &sbomData); err == nil {
+			if comps, ok := sbomData["components"].([]interface{}); ok {
+				findings = len(comps)
+			}
+		}
+
+		list = append(list, SBOMItem{
+			ID:          id,
+			ProjectName: projectName,
+			ObjectURL:   objectURL,
+			CreatedAt:   createdAt,
+			Source:      source,
+			Findings:    findings,
+		})
+	}
+
+	return c.JSON(list)
 }
