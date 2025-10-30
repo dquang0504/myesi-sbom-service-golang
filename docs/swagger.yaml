@@ -114,6 +114,38 @@ paths:
       summary: List SBOMs
       tags:
       - SBOM
+  /recent:
+    get:
+      consumes:
+      - application/json
+      description: Get recent SBOM uploads with optional project filter
+      parameters:
+      - description: Project Name
+        in: query
+        name: project_name
+        type: string
+      - description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              additionalProperties: true
+              type: object
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Recent SBOM uploads
+      tags:
+      - SBOM
   /upload:
     post:
       consumes:
