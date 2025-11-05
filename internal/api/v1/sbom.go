@@ -14,8 +14,7 @@ import (
 	fiber "github.com/gofiber/fiber/v2"
 )
 
-func RegisterSBOMRoutes(app *fiber.App) {
-	r := app.Group("/api/sbom")
+func RegisterSBOMRoutes(r fiber.Router) {
 	r.Post("/upload", uploadSBOM)
 	r.Get("/list", listSBOMs)
 	r.Post("/github", uploadSBOMFromGitHub)
@@ -127,7 +126,7 @@ func getSBOM(c *fiber.Ctx) error {
 	id := c.Params("id")
 	sbom, err := services.GetSBOM(c.Context(), db.Conn, id)
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "not found"})
+		return c.Status(404).JSON(fiber.Map{"error": "not found ád"})
 	}
 	return c.JSON(sbom)
 }

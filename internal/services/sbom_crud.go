@@ -50,6 +50,8 @@ func UpsertSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte
 		existing.ObjectURL = null.StringFrom(objectURL)
 		existing.Summary = null.JSONFrom(summaryBytes)
 		_, err := existing.Update(ctx, db, boil.Infer())
+
+		_ = UpdateProjectSBOMMeta(ctx, db, project)
 		return existing.ID, "update", err
 	}
 	//Insert if not found
@@ -70,4 +72,15 @@ func ListSBOM(ctx context.Context, db *sql.DB, project string, limit int) ([]*mo
 		return nil, err
 	}
 	return sboms, nil
+}
+
+// UpdateProjectSBOMMeta updates related project when new SBOM is uploaded.
+func UpdateProjectSBOMMeta(ctx context.Context, db *sql.DB, project string) error {
+	query := `
+		UPDATE projects
+		SET last_sbom_upload = NOW()
+		WHERE name = $1
+	`
+	_, err := db.ExecContext(ctx, query, project)
+	return err
 }
