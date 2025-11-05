@@ -8,7 +8,11 @@ import "testing"
 func TestUpsert(t *testing.T) {
 	t.Run("AlembicVersions", testAlembicVersionsUpsert)
 
+	t.Run("Projects", testProjectsUpsert)
+
 	t.Run("Sboms", testSbomsUpsert)
 
 	t.Run("Users", testUsersUpsert)
+
+	t.Run("Vulnerabilities", testVulnerabilitiesUpsert)
 }
