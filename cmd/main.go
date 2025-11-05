@@ -28,12 +28,11 @@ func main() {
 	app := fiber.New(fiber.Config{BodyLimit: 25 * 1024 * 1024})
 	api := app.Group("/api")
 
-    sbomGroup := api.Group("/sbom")
-    v1.RegisterSBOMRoutes(sbomGroup)
+	sbomGroup := api.Group("/sbom")
+	v1.RegisterSBOMRoutes(sbomGroup)
 
-    projectsGroup := api.Group("/projects")
-    v1.RegisterProjectRoutes(projectsGroup)
-
+	projectsGroup := api.Group("/projects")
+	v1.RegisterProjectRoutes(projectsGroup)
 
 	app.Get("/swagger/*", fiberSwagger.HandlerDefault) // Swagger UI endpoint
 	log.Println("SBOM service listening on port 8002")

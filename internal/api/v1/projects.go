@@ -50,9 +50,9 @@ func project_getAll(c *fiber.Ctx) error {
 // Get a single project
 func project_getOne(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-    if err != nil || id == 0 {
-        return fiber.NewError(fiber.StatusBadRequest, "invalid project id")
-    }
+	if err != nil || id == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid project id")
+	}
 
 	project, err := models.FindProject(c.Context(), db.Conn, id)
 	if err == sql.ErrNoRows {
@@ -97,9 +97,9 @@ func project_create(c *fiber.Ctx) error {
 // Update existing project
 func project_update(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-    if err != nil || id == 0 {
-        return fiber.NewError(fiber.StatusBadRequest, "invalid id")
-    }
+	if err != nil || id == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid id")
+	}
 	existing, err := models.FindProject(c.Context(), db.Conn, id)
 	if err == sql.ErrNoRows {
 		return fiber.NewError(fiber.StatusNotFound, "project not found")
@@ -145,9 +145,9 @@ func project_update(c *fiber.Ctx) error {
 // Delete a project
 func project_delete(c *fiber.Ctx) error {
 	id, err := c.ParamsInt("id")
-    if err != nil || id == 0 {
-        return fiber.NewError(fiber.StatusBadRequest, "invalid id")
-    }
+	if err != nil || id == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid id")
+	}
 
 	p, err := models.FindProject(c.Context(), db.Conn, id)
 	if err == sql.ErrNoRows {
