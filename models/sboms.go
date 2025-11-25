@@ -25,57 +25,67 @@ import (
 
 // Sbom is an object representing the database table.
 type Sbom struct {
-	ID          string      `boil:"id" json:"id" toml:"id" yaml:"id"`
-	ProjectName string      `boil:"project_name" json:"project_name" toml:"project_name" yaml:"project_name"`
-	Source      string      `boil:"source" json:"source" toml:"source" yaml:"source"`
-	Sbom        types.JSON  `boil:"sbom" json:"sbom" toml:"sbom" yaml:"sbom"`
-	Summary     null.JSON   `boil:"summary" json:"summary,omitempty" toml:"summary" yaml:"summary,omitempty"`
-	ObjectURL   null.String `boil:"object_url" json:"object_url,omitempty" toml:"object_url" yaml:"object_url,omitempty"`
-	CreatedAt   time.Time   `boil:"created_at" json:"created_at" toml:"created_at" yaml:"created_at"`
-	UpdatedAt   null.Time   `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
+	ID           string      `boil:"id" json:"id" toml:"id" yaml:"id"`
+	ProjectID    null.Int    `boil:"project_id" json:"project_id,omitempty" toml:"project_id" yaml:"project_id,omitempty"`
+	ProjectName  string      `boil:"project_name" json:"project_name" toml:"project_name" yaml:"project_name"`
+	ManifestName null.String `boil:"manifest_name" json:"manifest_name,omitempty" toml:"manifest_name" yaml:"manifest_name,omitempty"`
+	Source       string      `boil:"source" json:"source" toml:"source" yaml:"source"`
+	Sbom         types.JSON  `boil:"sbom" json:"sbom" toml:"sbom" yaml:"sbom"`
+	Summary      null.JSON   `boil:"summary" json:"summary,omitempty" toml:"summary" yaml:"summary,omitempty"`
+	ObjectURL    null.String `boil:"object_url" json:"object_url,omitempty" toml:"object_url" yaml:"object_url,omitempty"`
+	CreatedAt    null.Time   `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt    null.Time   `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
 
 	R *sbomR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L sbomL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var SbomColumns = struct {
-	ID          string
-	ProjectName string
-	Source      string
-	Sbom        string
-	Summary     string
-	ObjectURL   string
-	CreatedAt   string
-	UpdatedAt   string
+	ID           string
+	ProjectID    string
+	ProjectName  string
+	ManifestName string
+	Source       string
+	Sbom         string
+	Summary      string
+	ObjectURL    string
+	CreatedAt    string
+	UpdatedAt    string
 }{
-	ID:          "id",
-	ProjectName: "project_name",
-	Source:      "source",
-	Sbom:        "sbom",
-	Summary:     "summary",
-	ObjectURL:   "object_url",
-	CreatedAt:   "created_at",
-	UpdatedAt:   "updated_at",
+	ID:           "id",
+	ProjectID:    "project_id",
+	ProjectName:  "project_name",
+	ManifestName: "manifest_name",
+	Source:       "source",
+	Sbom:         "sbom",
+	Summary:      "summary",
+	ObjectURL:    "object_url",
+	CreatedAt:    "created_at",
+	UpdatedAt:    "updated_at",
 }
 
 var SbomTableColumns = struct {
-	ID          string
-	ProjectName string
-	Source      string
-	Sbom        string
-	Summary     string
-	ObjectURL   string
-	CreatedAt   string
-	UpdatedAt   string
+	ID           string
+	ProjectID    string
+	ProjectName  string
+	ManifestName string
+	Source       string
+	Sbom         string
+	Summary      string
+	ObjectURL    string
+	CreatedAt    string
+	UpdatedAt    string
 }{
-	ID:          "sboms.id",
-	ProjectName: "sboms.project_name",
-	Source:      "sboms.source",
-	Sbom:        "sboms.sbom",
-	Summary:     "sboms.summary",
-	ObjectURL:   "sboms.object_url",
-	CreatedAt:   "sboms.created_at",
-	UpdatedAt:   "sboms.updated_at",
+	ID:           "sboms.id",
+	ProjectID:    "sboms.project_id",
+	ProjectName:  "sboms.project_name",
+	ManifestName: "sboms.manifest_name",
+	Source:       "sboms.source",
+	Sbom:         "sboms.sbom",
+	Summary:      "sboms.summary",
+	ObjectURL:    "sboms.object_url",
+	CreatedAt:    "sboms.created_at",
+	UpdatedAt:    "sboms.updated_at",
 }
 
 // Generated where
@@ -101,77 +111,43 @@ func (w whereHelpertypes_JSON) GTE(x types.JSON) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GTE, x)
 }
 
-type whereHelpernull_JSON struct{ field string }
-
-func (w whereHelpernull_JSON) EQ(x null.JSON) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, false, x)
-}
-func (w whereHelpernull_JSON) NEQ(x null.JSON) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, true, x)
-}
-func (w whereHelpernull_JSON) LT(x null.JSON) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpernull_JSON) LTE(x null.JSON) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpernull_JSON) GT(x null.JSON) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpernull_JSON) GTE(x null.JSON) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
-
-func (w whereHelpernull_JSON) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_JSON) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
-
-type whereHelpertime_Time struct{ field string }
-
-func (w whereHelpertime_Time) EQ(x time.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.EQ, x)
-}
-func (w whereHelpertime_Time) NEQ(x time.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.NEQ, x)
-}
-func (w whereHelpertime_Time) LT(x time.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpertime_Time) LTE(x time.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpertime_Time) GT(x time.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
-
 var SbomWhere = struct {
-	ID          whereHelperstring
-	ProjectName whereHelperstring
-	Source      whereHelperstring
-	Sbom        whereHelpertypes_JSON
-	Summary     whereHelpernull_JSON
-	ObjectURL   whereHelpernull_String
-	CreatedAt   whereHelpertime_Time
-	UpdatedAt   whereHelpernull_Time
+	ID           whereHelperstring
+	ProjectID    whereHelpernull_Int
+	ProjectName  whereHelperstring
+	ManifestName whereHelpernull_String
+	Source       whereHelperstring
+	Sbom         whereHelpertypes_JSON
+	Summary      whereHelpernull_JSON
+	ObjectURL    whereHelpernull_String
+	CreatedAt    whereHelpernull_Time
+	UpdatedAt    whereHelpernull_Time
 }{
-	ID:          whereHelperstring{field: "\"sboms\".\"id\""},
-	ProjectName: whereHelperstring{field: "\"sboms\".\"project_name\""},
-	Source:      whereHelperstring{field: "\"sboms\".\"source\""},
-	Sbom:        whereHelpertypes_JSON{field: "\"sboms\".\"sbom\""},
-	Summary:     whereHelpernull_JSON{field: "\"sboms\".\"summary\""},
-	ObjectURL:   whereHelpernull_String{field: "\"sboms\".\"object_url\""},
-	CreatedAt:   whereHelpertime_Time{field: "\"sboms\".\"created_at\""},
-	UpdatedAt:   whereHelpernull_Time{field: "\"sboms\".\"updated_at\""},
+	ID:           whereHelperstring{field: "\"sboms\".\"id\""},
+	ProjectID:    whereHelpernull_Int{field: "\"sboms\".\"project_id\""},
+	ProjectName:  whereHelperstring{field: "\"sboms\".\"project_name\""},
+	ManifestName: whereHelpernull_String{field: "\"sboms\".\"manifest_name\""},
+	Source:       whereHelperstring{field: "\"sboms\".\"source\""},
+	Sbom:         whereHelpertypes_JSON{field: "\"sboms\".\"sbom\""},
+	Summary:      whereHelpernull_JSON{field: "\"sboms\".\"summary\""},
+	ObjectURL:    whereHelpernull_String{field: "\"sboms\".\"object_url\""},
+	CreatedAt:    whereHelpernull_Time{field: "\"sboms\".\"created_at\""},
+	UpdatedAt:    whereHelpernull_Time{field: "\"sboms\".\"updated_at\""},
 }
 
 // SbomRels is where relationship names are stored.
 var SbomRels = struct {
-}{}
+	Project  string
+	ScanJobs string
+}{
+	Project:  "Project",
+	ScanJobs: "ScanJobs",
+}
 
 // sbomR is where relationships are stored.
 type sbomR struct {
+	Project  *Project     `boil:"Project" json:"Project" toml:"Project" yaml:"Project"`
+	ScanJobs ScanJobSlice `boil:"ScanJobs" json:"ScanJobs" toml:"ScanJobs" yaml:"ScanJobs"`
 }
 
 // NewStruct creates a new relationship struct
@@ -179,13 +155,45 @@ func (*sbomR) NewStruct() *sbomR {
 	return &sbomR{}
 }
 
+func (o *Sbom) GetProject() *Project {
+	if o == nil {
+		return nil
+	}
+
+	return o.R.GetProject()
+}
+
+func (r *sbomR) GetProject() *Project {
+	if r == nil {
+		return nil
+	}
+
+	return r.Project
+}
+
+func (o *Sbom) GetScanJobs() ScanJobSlice {
+	if o == nil {
+		return nil
+	}
+
+	return o.R.GetScanJobs()
+}
+
+func (r *sbomR) GetScanJobs() ScanJobSlice {
+	if r == nil {
+		return nil
+	}
+
+	return r.ScanJobs
+}
+
 // sbomL is where Load methods for each relationship are stored.
 type sbomL struct{}
 
 var (
-	sbomAllColumns            = []string{"id", "project_name", "source", "sbom", "summary", "object_url", "created_at", "updated_at"}
-	sbomColumnsWithoutDefault = []string{"id", "project_name", "source", "sbom"}
-	sbomColumnsWithDefault    = []string{"summary", "object_url", "created_at", "updated_at"}
+	sbomAllColumns            = []string{"id", "project_id", "project_name", "manifest_name", "source", "sbom", "summary", "object_url", "created_at", "updated_at"}
+	sbomColumnsWithoutDefault = []string{"project_name", "source", "sbom"}
+	sbomColumnsWithDefault    = []string{"id", "project_id", "manifest_name", "summary", "object_url", "created_at", "updated_at"}
 	sbomPrimaryKeyColumns     = []string{"id"}
 	sbomGeneratedColumns      = []string{}
 )
@@ -495,6 +503,475 @@ func (q sbomQuery) Exists(ctx context.Context, exec boil.ContextExecutor) (bool,
 	return count > 0, nil
 }
 
+// Project pointed to by the foreign key.
+func (o *Sbom) Project(mods ...qm.QueryMod) projectQuery {
+	queryMods := []qm.QueryMod{
+		qm.Where("\"id\" = ?", o.ProjectID),
+	}
+
+	queryMods = append(queryMods, mods...)
+
+	return Projects(queryMods...)
+}
+
+// ScanJobs retrieves all the scan_job's ScanJobs with an executor.
+func (o *Sbom) ScanJobs(mods ...qm.QueryMod) scanJobQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"scan_jobs\".\"sbom_id\"=?", o.ID),
+	)
+
+	return ScanJobs(queryMods...)
+}
+
+// LoadProject allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for an N-1 relationship.
+func (sbomL) LoadProject(ctx context.Context, e boil.ContextExecutor, singular bool, maybeSbom interface{}, mods queries.Applicator) error {
+	var slice []*Sbom
+	var object *Sbom
+
+	if singular {
+		var ok bool
+		object, ok = maybeSbom.(*Sbom)
+		if !ok {
+			object = new(Sbom)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeSbom)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeSbom))
+			}
+		}
+	} else {
+		s, ok := maybeSbom.(*[]*Sbom)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeSbom)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeSbom))
+			}
+		}
+	}
+
+	args := make(map[interface{}]struct{})
+	if singular {
+		if object.R == nil {
+			object.R = &sbomR{}
+		}
+		if !queries.IsNil(object.ProjectID) {
+			args[object.ProjectID] = struct{}{}
+		}
+
+	} else {
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &sbomR{}
+			}
+
+			if !queries.IsNil(obj.ProjectID) {
+				args[obj.ProjectID] = struct{}{}
+			}
+
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	argsSlice := make([]interface{}, len(args))
+	i := 0
+	for arg := range args {
+		argsSlice[i] = arg
+		i++
+	}
+
+	query := NewQuery(
+		qm.From(`projects`),
+		qm.WhereIn(`projects.id in ?`, argsSlice...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load Project")
+	}
+
+	var resultSlice []*Project
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice Project")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results of eager load for projects")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for projects")
+	}
+
+	if len(projectAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(resultSlice) == 0 {
+		return nil
+	}
+
+	if singular {
+		foreign := resultSlice[0]
+		object.R.Project = foreign
+		if foreign.R == nil {
+			foreign.R = &projectR{}
+		}
+		foreign.R.Sboms = append(foreign.R.Sboms, object)
+		return nil
+	}
+
+	for _, local := range slice {
+		for _, foreign := range resultSlice {
+			if queries.Equal(local.ProjectID, foreign.ID) {
+				local.R.Project = foreign
+				if foreign.R == nil {
+					foreign.R = &projectR{}
+				}
+				foreign.R.Sboms = append(foreign.R.Sboms, local)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadScanJobs allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (sbomL) LoadScanJobs(ctx context.Context, e boil.ContextExecutor, singular bool, maybeSbom interface{}, mods queries.Applicator) error {
+	var slice []*Sbom
+	var object *Sbom
+
+	if singular {
+		var ok bool
+		object, ok = maybeSbom.(*Sbom)
+		if !ok {
+			object = new(Sbom)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeSbom)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeSbom))
+			}
+		}
+	} else {
+		s, ok := maybeSbom.(*[]*Sbom)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeSbom)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeSbom))
+			}
+		}
+	}
+
+	args := make(map[interface{}]struct{})
+	if singular {
+		if object.R == nil {
+			object.R = &sbomR{}
+		}
+		args[object.ID] = struct{}{}
+	} else {
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &sbomR{}
+			}
+			args[obj.ID] = struct{}{}
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	argsSlice := make([]interface{}, len(args))
+	i := 0
+	for arg := range args {
+		argsSlice[i] = arg
+		i++
+	}
+
+	query := NewQuery(
+		qm.From(`scan_jobs`),
+		qm.WhereIn(`scan_jobs.sbom_id in ?`, argsSlice...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load scan_jobs")
+	}
+
+	var resultSlice []*ScanJob
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice scan_jobs")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on scan_jobs")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for scan_jobs")
+	}
+
+	if len(scanJobAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.ScanJobs = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &scanJobR{}
+			}
+			foreign.R.Sbom = object
+		}
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if queries.Equal(local.ID, foreign.SbomID) {
+				local.R.ScanJobs = append(local.R.ScanJobs, foreign)
+				if foreign.R == nil {
+					foreign.R = &scanJobR{}
+				}
+				foreign.R.Sbom = local
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// SetProject of the sbom to the related item.
+// Sets o.R.Project to related.
+// Adds o to related.R.Sboms.
+func (o *Sbom) SetProject(ctx context.Context, exec boil.ContextExecutor, insert bool, related *Project) error {
+	var err error
+	if insert {
+		if err = related.Insert(ctx, exec, boil.Infer()); err != nil {
+			return errors.Wrap(err, "failed to insert into foreign table")
+		}
+	}
+
+	updateQuery := fmt.Sprintf(
+		"UPDATE \"sboms\" SET %s WHERE %s",
+		strmangle.SetParamNames("\"", "\"", 1, []string{"project_id"}),
+		strmangle.WhereClause("\"", "\"", 2, sbomPrimaryKeyColumns),
+	)
+	values := []interface{}{related.ID, o.ID}
+
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, updateQuery)
+		fmt.Fprintln(writer, values)
+	}
+	if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	queries.Assign(&o.ProjectID, related.ID)
+	if o.R == nil {
+		o.R = &sbomR{
+			Project: related,
+		}
+	} else {
+		o.R.Project = related
+	}
+
+	if related.R == nil {
+		related.R = &projectR{
+			Sboms: SbomSlice{o},
+		}
+	} else {
+		related.R.Sboms = append(related.R.Sboms, o)
+	}
+
+	return nil
+}
+
+// RemoveProject relationship.
+// Sets o.R.Project to nil.
+// Removes o from all passed in related items' relationships struct.
+func (o *Sbom) RemoveProject(ctx context.Context, exec boil.ContextExecutor, related *Project) error {
+	var err error
+
+	queries.SetScanner(&o.ProjectID, nil)
+	if _, err = o.Update(ctx, exec, boil.Whitelist("project_id")); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	if o.R != nil {
+		o.R.Project = nil
+	}
+	if related == nil || related.R == nil {
+		return nil
+	}
+
+	for i, ri := range related.R.Sboms {
+		if queries.Equal(o.ProjectID, ri.ProjectID) {
+			continue
+		}
+
+		ln := len(related.R.Sboms)
+		if ln > 1 && i < ln-1 {
+			related.R.Sboms[i] = related.R.Sboms[ln-1]
+		}
+		related.R.Sboms = related.R.Sboms[:ln-1]
+		break
+	}
+	return nil
+}
+
+// AddScanJobs adds the given related objects to the existing relationships
+// of the sbom, optionally inserting them as new records.
+// Appends related to o.R.ScanJobs.
+// Sets related.R.Sbom appropriately.
+func (o *Sbom) AddScanJobs(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*ScanJob) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			queries.Assign(&rel.SbomID, o.ID)
+			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"scan_jobs\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"sbom_id"}),
+				strmangle.WhereClause("\"", "\"", 2, scanJobPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.IsDebug(ctx) {
+				writer := boil.DebugWriterFrom(ctx)
+				fmt.Fprintln(writer, updateQuery)
+				fmt.Fprintln(writer, values)
+			}
+			if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			queries.Assign(&rel.SbomID, o.ID)
+		}
+	}
+
+	if o.R == nil {
+		o.R = &sbomR{
+			ScanJobs: related,
+		}
+	} else {
+		o.R.ScanJobs = append(o.R.ScanJobs, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &scanJobR{
+				Sbom: o,
+			}
+		} else {
+			rel.R.Sbom = o
+		}
+	}
+	return nil
+}
+
+// SetScanJobs removes all previously related items of the
+// sbom replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Sbom's ScanJobs accordingly.
+// Replaces o.R.ScanJobs with related.
+// Sets related.R.Sbom's ScanJobs accordingly.
+func (o *Sbom) SetScanJobs(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*ScanJob) error {
+	query := "update \"scan_jobs\" set \"sbom_id\" = null where \"sbom_id\" = $1"
+	values := []interface{}{o.ID}
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, query)
+		fmt.Fprintln(writer, values)
+	}
+	_, err := exec.ExecContext(ctx, query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+
+	if o.R != nil {
+		for _, rel := range o.R.ScanJobs {
+			queries.SetScanner(&rel.SbomID, nil)
+			if rel.R == nil {
+				continue
+			}
+
+			rel.R.Sbom = nil
+		}
+		o.R.ScanJobs = nil
+	}
+
+	return o.AddScanJobs(ctx, exec, insert, related...)
+}
+
+// RemoveScanJobs relationships from objects passed in.
+// Removes related items from R.ScanJobs (uses pointer comparison, removal does not keep order)
+// Sets related.R.Sbom.
+func (o *Sbom) RemoveScanJobs(ctx context.Context, exec boil.ContextExecutor, related ...*ScanJob) error {
+	if len(related) == 0 {
+		return nil
+	}
+
+	var err error
+	for _, rel := range related {
+		queries.SetScanner(&rel.SbomID, nil)
+		if rel.R != nil {
+			rel.R.Sbom = nil
+		}
+		if _, err = rel.Update(ctx, exec, boil.Whitelist("sbom_id")); err != nil {
+			return err
+		}
+	}
+	if o.R == nil {
+		return nil
+	}
+
+	for _, rel := range related {
+		for i, ri := range o.R.ScanJobs {
+			if rel != ri {
+				continue
+			}
+
+			ln := len(o.R.ScanJobs)
+			if ln > 1 && i < ln-1 {
+				o.R.ScanJobs[i] = o.R.ScanJobs[ln-1]
+			}
+			o.R.ScanJobs = o.R.ScanJobs[:ln-1]
+			break
+		}
+	}
+
+	return nil
+}
+
 // Sboms retrieves all the records using an executor.
 func Sboms(mods ...qm.QueryMod) sbomQuery {
 	mods = append(mods, qm.From("\"sboms\""))
@@ -547,8 +1024,8 @@ func (o *Sbom) Insert(ctx context.Context, exec boil.ContextExecutor, columns bo
 	if !boil.TimestampsAreSkipped(ctx) {
 		currTime := time.Now().In(boil.GetLocation())
 
-		if o.CreatedAt.IsZero() {
-			o.CreatedAt = currTime
+		if queries.MustTime(o.CreatedAt).IsZero() {
+			queries.SetScanner(&o.CreatedAt, currTime)
 		}
 		if queries.MustTime(o.UpdatedAt).IsZero() {
 			queries.SetScanner(&o.UpdatedAt, currTime)
@@ -768,8 +1245,8 @@ func (o *Sbom) Upsert(ctx context.Context, exec boil.ContextExecutor, updateOnCo
 	if !boil.TimestampsAreSkipped(ctx) {
 		currTime := time.Now().In(boil.GetLocation())
 
-		if o.CreatedAt.IsZero() {
-			o.CreatedAt = currTime
+		if queries.MustTime(o.CreatedAt).IsZero() {
+			queries.SetScanner(&o.CreatedAt, currTime)
 		}
 		queries.SetScanner(&o.UpdatedAt, currTime)
 	}

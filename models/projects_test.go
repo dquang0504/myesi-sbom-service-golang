@@ -494,6 +494,784 @@ func testProjectsInsertWhitelist(t *testing.T) {
 	}
 }
 
+func testProjectToManySboms(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c Sbom
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, true, projectColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Project struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, sbomDBTypes, false, sbomColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, sbomDBTypes, false, sbomColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.ProjectID, a.ID)
+	queries.Assign(&c.ProjectID, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.Sboms().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.ProjectID, b.ProjectID) {
+			bFound = true
+		}
+		if queries.Equal(v.ProjectID, c.ProjectID) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := ProjectSlice{&a}
+	if err = a.L.LoadSboms(ctx, tx, false, (*[]*Project)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Sboms); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.Sboms = nil
+	if err = a.L.LoadSboms(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.Sboms); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testProjectToManyScanJobs(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, true, projectColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Project struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, scanJobDBTypes, false, scanJobColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, scanJobDBTypes, false, scanJobColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.ProjectID, a.ID)
+	queries.Assign(&c.ProjectID, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.ScanJobs().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.ProjectID, b.ProjectID) {
+			bFound = true
+		}
+		if queries.Equal(v.ProjectID, c.ProjectID) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := ProjectSlice{&a}
+	if err = a.L.LoadScanJobs(ctx, tx, false, (*[]*Project)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.ScanJobs); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.ScanJobs = nil
+	if err = a.L.LoadScanJobs(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.ScanJobs); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testProjectToManyAddOpSboms(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c, d, e Sbom
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Sbom{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Sbom{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddSboms(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.ProjectID) {
+			t.Error("foreign key was wrong value", a.ID, first.ProjectID)
+		}
+		if !queries.Equal(a.ID, second.ProjectID) {
+			t.Error("foreign key was wrong value", a.ID, second.ProjectID)
+		}
+
+		if first.R.Project != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Project != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.Sboms[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.Sboms[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.Sboms().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testProjectToManySetOpSboms(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c, d, e Sbom
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Sbom{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetSboms(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Sboms().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetSboms(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Sboms().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.ProjectID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.ProjectID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.ProjectID) {
+		t.Error("foreign key was wrong value", a.ID, d.ProjectID)
+	}
+	if !queries.Equal(a.ID, e.ProjectID) {
+		t.Error("foreign key was wrong value", a.ID, e.ProjectID)
+	}
+
+	if b.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Project != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.Project != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.Sboms[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.Sboms[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testProjectToManyRemoveOpSboms(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c, d, e Sbom
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Sbom{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddSboms(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.Sboms().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveSboms(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.Sboms().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.ProjectID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.ProjectID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Project != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.Project != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.Sboms) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.Sboms[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.Sboms[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testProjectToManyAddOpScanJobs(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c, d, e ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*ScanJob{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, scanJobDBTypes, false, strmangle.SetComplement(scanJobPrimaryKeyColumns, scanJobColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*ScanJob{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddScanJobs(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.ProjectID) {
+			t.Error("foreign key was wrong value", a.ID, first.ProjectID)
+		}
+		if !queries.Equal(a.ID, second.ProjectID) {
+			t.Error("foreign key was wrong value", a.ID, second.ProjectID)
+		}
+
+		if first.R.Project != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Project != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.ScanJobs[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.ScanJobs[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.ScanJobs().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testProjectToManySetOpScanJobs(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c, d, e ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*ScanJob{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, scanJobDBTypes, false, strmangle.SetComplement(scanJobPrimaryKeyColumns, scanJobColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetScanJobs(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetScanJobs(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.ProjectID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.ProjectID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.ProjectID) {
+		t.Error("foreign key was wrong value", a.ID, d.ProjectID)
+	}
+	if !queries.Equal(a.ID, e.ProjectID) {
+		t.Error("foreign key was wrong value", a.ID, e.ProjectID)
+	}
+
+	if b.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Project != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.Project != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.ScanJobs[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.ScanJobs[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testProjectToManyRemoveOpScanJobs(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c, d, e ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*ScanJob{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, scanJobDBTypes, false, strmangle.SetComplement(scanJobPrimaryKeyColumns, scanJobColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddScanJobs(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveScanJobs(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.ProjectID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.ProjectID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Project != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Project != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.Project != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.ScanJobs) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.ScanJobs[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.ScanJobs[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testProjectToOneUserUsingCreatedByUser(t *testing.T) {
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var local Project
+	var foreign User
+
+	seed := randomize.NewSeed()
+	if err := randomize.Struct(seed, &local, projectDBTypes, true, projectColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Project struct: %s", err)
+	}
+	if err := randomize.Struct(seed, &foreign, userDBTypes, false, userColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize User struct: %s", err)
+	}
+
+	if err := foreign.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&local.CreatedBy, foreign.ID)
+	if err := local.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := local.CreatedByUser().One(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !queries.Equal(check.ID, foreign.ID) {
+		t.Errorf("want: %v, got %v", foreign.ID, check.ID)
+	}
+
+	ranAfterSelectHook := false
+	AddUserHook(boil.AfterSelectHook, func(ctx context.Context, e boil.ContextExecutor, o *User) error {
+		ranAfterSelectHook = true
+		return nil
+	})
+
+	slice := ProjectSlice{&local}
+	if err = local.L.LoadCreatedByUser(ctx, tx, false, (*[]*Project)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.CreatedByUser == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	local.R.CreatedByUser = nil
+	if err = local.L.LoadCreatedByUser(ctx, tx, true, &local, nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.CreatedByUser == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	if !ranAfterSelectHook {
+		t.Error("failed to run AfterSelect hook for relationship")
+	}
+}
+
+func testProjectToOneOrganizationUsingOrganization(t *testing.T) {
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var local Project
+	var foreign Organization
+
+	seed := randomize.NewSeed()
+	if err := randomize.Struct(seed, &local, projectDBTypes, true, projectColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Project struct: %s", err)
+	}
+	if err := randomize.Struct(seed, &foreign, organizationDBTypes, false, organizationColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Organization struct: %s", err)
+	}
+
+	if err := foreign.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&local.OrganizationID, foreign.ID)
+	if err := local.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := local.Organization().One(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !queries.Equal(check.ID, foreign.ID) {
+		t.Errorf("want: %v, got %v", foreign.ID, check.ID)
+	}
+
+	ranAfterSelectHook := false
+	AddOrganizationHook(boil.AfterSelectHook, func(ctx context.Context, e boil.ContextExecutor, o *Organization) error {
+		ranAfterSelectHook = true
+		return nil
+	})
+
+	slice := ProjectSlice{&local}
+	if err = local.L.LoadOrganization(ctx, tx, false, (*[]*Project)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.Organization == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	local.R.Organization = nil
+	if err = local.L.LoadOrganization(ctx, tx, true, &local, nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.Organization == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	if !ranAfterSelectHook {
+		t.Error("failed to run AfterSelect hook for relationship")
+	}
+}
+
 func testProjectToOneUserUsingOwner(t *testing.T) {
 	ctx := context.Background()
 	tx := MustTx(boil.BeginTx(ctx, nil))
@@ -552,6 +1330,224 @@ func testProjectToOneUserUsingOwner(t *testing.T) {
 
 	if !ranAfterSelectHook {
 		t.Error("failed to run AfterSelect hook for relationship")
+	}
+}
+
+func testProjectToOneSetOpUserUsingCreatedByUser(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c User
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, x := range []*User{&b, &c} {
+		err = a.SetCreatedByUser(ctx, tx, i != 0, x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if a.R.CreatedByUser != x {
+			t.Error("relationship struct not set to correct value")
+		}
+
+		if x.R.CreatedByProjects[0] != &a {
+			t.Error("failed to append to foreign relationship struct")
+		}
+		if !queries.Equal(a.CreatedBy, x.ID) {
+			t.Error("foreign key was wrong value", a.CreatedBy)
+		}
+
+		zero := reflect.Zero(reflect.TypeOf(a.CreatedBy))
+		reflect.Indirect(reflect.ValueOf(&a.CreatedBy)).Set(zero)
+
+		if err = a.Reload(ctx, tx); err != nil {
+			t.Fatal("failed to reload", err)
+		}
+
+		if !queries.Equal(a.CreatedBy, x.ID) {
+			t.Error("foreign key was wrong value", a.CreatedBy, x.ID)
+		}
+	}
+}
+
+func testProjectToOneRemoveOpUserUsingCreatedByUser(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b User
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.SetCreatedByUser(ctx, tx, true, &b); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.RemoveCreatedByUser(ctx, tx, &b); err != nil {
+		t.Error("failed to remove relationship")
+	}
+
+	count, err := a.CreatedByUser().Count(ctx, tx)
+	if err != nil {
+		t.Error(err)
+	}
+	if count != 0 {
+		t.Error("want no relationships remaining")
+	}
+
+	if a.R.CreatedByUser != nil {
+		t.Error("R struct entry should be nil")
+	}
+
+	if !queries.IsValuerNil(a.CreatedBy) {
+		t.Error("foreign key value should be nil")
+	}
+
+	if len(b.R.CreatedByProjects) != 0 {
+		t.Error("failed to remove a from b's relationships")
+	}
+}
+
+func testProjectToOneSetOpOrganizationUsingOrganization(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b, c Organization
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, organizationDBTypes, false, strmangle.SetComplement(organizationPrimaryKeyColumns, organizationColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, organizationDBTypes, false, strmangle.SetComplement(organizationPrimaryKeyColumns, organizationColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, x := range []*Organization{&b, &c} {
+		err = a.SetOrganization(ctx, tx, i != 0, x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if a.R.Organization != x {
+			t.Error("relationship struct not set to correct value")
+		}
+
+		if x.R.Projects[0] != &a {
+			t.Error("failed to append to foreign relationship struct")
+		}
+		if !queries.Equal(a.OrganizationID, x.ID) {
+			t.Error("foreign key was wrong value", a.OrganizationID)
+		}
+
+		zero := reflect.Zero(reflect.TypeOf(a.OrganizationID))
+		reflect.Indirect(reflect.ValueOf(&a.OrganizationID)).Set(zero)
+
+		if err = a.Reload(ctx, tx); err != nil {
+			t.Fatal("failed to reload", err)
+		}
+
+		if !queries.Equal(a.OrganizationID, x.ID) {
+			t.Error("foreign key was wrong value", a.OrganizationID, x.ID)
+		}
+	}
+}
+
+func testProjectToOneRemoveOpOrganizationUsingOrganization(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Project
+	var b Organization
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, organizationDBTypes, false, strmangle.SetComplement(organizationPrimaryKeyColumns, organizationColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.SetOrganization(ctx, tx, true, &b); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.RemoveOrganization(ctx, tx, &b); err != nil {
+		t.Error("failed to remove relationship")
+	}
+
+	count, err := a.Organization().Count(ctx, tx)
+	if err != nil {
+		t.Error(err)
+	}
+	if count != 0 {
+		t.Error("want no relationships remaining")
+	}
+
+	if a.R.Organization != nil {
+		t.Error("R struct entry should be nil")
+	}
+
+	if !queries.IsValuerNil(a.OrganizationID) {
+		t.Error("foreign key value should be nil")
+	}
+
+	if len(b.R.Projects) != 0 {
+		t.Error("failed to remove a from b's relationships")
 	}
 }
 
@@ -738,7 +1734,7 @@ func testProjectsSelect(t *testing.T) {
 }
 
 var (
-	projectDBTypes = map[string]string{`ID`: `integer`, `Name`: `character varying`, `Description`: `text`, `OwnerID`: `integer`, `RepoURL`: `text`, `LastSbomUpload`: `timestamp with time zone`, `LastVulnScan`: `timestamp with time zone`, `AvgRiskScore`: `numeric`, `TotalVulnerabilities`: `integer`, `CreatedAt`: `timestamp with time zone`}
+	projectDBTypes = map[string]string{`ID`: `integer`, `Name`: `character varying`, `Description`: `text`, `OwnerID`: `integer`, `OrganizationID`: `integer`, `CreatedBy`: `integer`, `SourceType`: `character varying`, `RepoURL`: `text`, `GithubRepoID`: `bigint`, `GithubFullName`: `text`, `GithubVisibility`: `character varying`, `GithubDefaultBranch`: `text`, `GithubLanguage`: `jsonb`, `StargazersCount`: `integer`, `ForksCount`: `integer`, `IsFork`: `boolean`, `GithubLastSync`: `timestamp with time zone`, `LastSyncError`: `text`, `ImportStatus`: `character varying`, `ScanStatus`: `character varying`, `LastSbomUpload`: `timestamp with time zone`, `LastVulnScan`: `timestamp with time zone`, `AvgRiskScore`: `numeric`, `TotalVulnerabilities`: `integer`, `CreatedAt`: `timestamp with time zone`, `UpdatedAt`: `timestamp with time zone`}
 	_              = bytes.MinRead
 )
 

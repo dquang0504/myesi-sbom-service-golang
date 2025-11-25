@@ -494,6 +494,504 @@ func testSbomsInsertWhitelist(t *testing.T) {
 	}
 }
 
+func testSbomToManyScanJobs(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Sbom
+	var b, c ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, sbomDBTypes, true, sbomColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Sbom struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, scanJobDBTypes, false, scanJobColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, scanJobDBTypes, false, scanJobColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&b.SbomID, a.ID)
+	queries.Assign(&c.SbomID, a.ID)
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.ScanJobs().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if queries.Equal(v.SbomID, b.SbomID) {
+			bFound = true
+		}
+		if queries.Equal(v.SbomID, c.SbomID) {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := SbomSlice{&a}
+	if err = a.L.LoadScanJobs(ctx, tx, false, (*[]*Sbom)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.ScanJobs); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.ScanJobs = nil
+	if err = a.L.LoadScanJobs(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.ScanJobs); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
+func testSbomToManyAddOpScanJobs(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Sbom
+	var b, c, d, e ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*ScanJob{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, scanJobDBTypes, false, strmangle.SetComplement(scanJobPrimaryKeyColumns, scanJobColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*ScanJob{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddScanJobs(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if !queries.Equal(a.ID, first.SbomID) {
+			t.Error("foreign key was wrong value", a.ID, first.SbomID)
+		}
+		if !queries.Equal(a.ID, second.SbomID) {
+			t.Error("foreign key was wrong value", a.ID, second.SbomID)
+		}
+
+		if first.R.Sbom != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.Sbom != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.ScanJobs[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.ScanJobs[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.ScanJobs().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+
+func testSbomToManySetOpScanJobs(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Sbom
+	var b, c, d, e ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*ScanJob{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, scanJobDBTypes, false, strmangle.SetComplement(scanJobPrimaryKeyColumns, scanJobColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.SetScanJobs(ctx, tx, false, &b, &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.SetScanJobs(ctx, tx, true, &d, &e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.SbomID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.SbomID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+	if !queries.Equal(a.ID, d.SbomID) {
+		t.Error("foreign key was wrong value", a.ID, d.SbomID)
+	}
+	if !queries.Equal(a.ID, e.SbomID) {
+		t.Error("foreign key was wrong value", a.ID, e.SbomID)
+	}
+
+	if b.R.Sbom != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Sbom != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Sbom != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+	if e.R.Sbom != &a {
+		t.Error("relationship was not added properly to the foreign struct")
+	}
+
+	if a.R.ScanJobs[0] != &d {
+		t.Error("relationship struct slice not set to correct value")
+	}
+	if a.R.ScanJobs[1] != &e {
+		t.Error("relationship struct slice not set to correct value")
+	}
+}
+
+func testSbomToManyRemoveOpScanJobs(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Sbom
+	var b, c, d, e ScanJob
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*ScanJob{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, scanJobDBTypes, false, strmangle.SetComplement(scanJobPrimaryKeyColumns, scanJobColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	err = a.AddScanJobs(ctx, tx, true, foreigners...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err := a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 4 {
+		t.Error("count was wrong:", count)
+	}
+
+	err = a.RemoveScanJobs(ctx, tx, foreigners[:2]...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count, err = a.ScanJobs().Count(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Error("count was wrong:", count)
+	}
+
+	if !queries.IsValuerNil(b.SbomID) {
+		t.Error("want b's foreign key value to be nil")
+	}
+	if !queries.IsValuerNil(c.SbomID) {
+		t.Error("want c's foreign key value to be nil")
+	}
+
+	if b.R.Sbom != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if c.R.Sbom != nil {
+		t.Error("relationship was not removed properly from the foreign struct")
+	}
+	if d.R.Sbom != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+	if e.R.Sbom != &a {
+		t.Error("relationship to a should have been preserved")
+	}
+
+	if len(a.R.ScanJobs) != 2 {
+		t.Error("should have preserved two relationships")
+	}
+
+	// Removal doesn't do a stable deletion for performance so we have to flip the order
+	if a.R.ScanJobs[1] != &d {
+		t.Error("relationship to d should have been preserved")
+	}
+	if a.R.ScanJobs[0] != &e {
+		t.Error("relationship to e should have been preserved")
+	}
+}
+
+func testSbomToOneProjectUsingProject(t *testing.T) {
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var local Sbom
+	var foreign Project
+
+	seed := randomize.NewSeed()
+	if err := randomize.Struct(seed, &local, sbomDBTypes, true, sbomColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Sbom struct: %s", err)
+	}
+	if err := randomize.Struct(seed, &foreign, projectDBTypes, false, projectColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize Project struct: %s", err)
+	}
+
+	if err := foreign.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	queries.Assign(&local.ProjectID, foreign.ID)
+	if err := local.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := local.Project().One(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !queries.Equal(check.ID, foreign.ID) {
+		t.Errorf("want: %v, got %v", foreign.ID, check.ID)
+	}
+
+	ranAfterSelectHook := false
+	AddProjectHook(boil.AfterSelectHook, func(ctx context.Context, e boil.ContextExecutor, o *Project) error {
+		ranAfterSelectHook = true
+		return nil
+	})
+
+	slice := SbomSlice{&local}
+	if err = local.L.LoadProject(ctx, tx, false, (*[]*Sbom)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.Project == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	local.R.Project = nil
+	if err = local.L.LoadProject(ctx, tx, true, &local, nil); err != nil {
+		t.Fatal(err)
+	}
+	if local.R.Project == nil {
+		t.Error("struct should have been eager loaded")
+	}
+
+	if !ranAfterSelectHook {
+		t.Error("failed to run AfterSelect hook for relationship")
+	}
+}
+
+func testSbomToOneSetOpProjectUsingProject(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Sbom
+	var b, c Project
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, x := range []*Project{&b, &c} {
+		err = a.SetProject(ctx, tx, i != 0, x)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if a.R.Project != x {
+			t.Error("relationship struct not set to correct value")
+		}
+
+		if x.R.Sboms[0] != &a {
+			t.Error("failed to append to foreign relationship struct")
+		}
+		if !queries.Equal(a.ProjectID, x.ID) {
+			t.Error("foreign key was wrong value", a.ProjectID)
+		}
+
+		zero := reflect.Zero(reflect.TypeOf(a.ProjectID))
+		reflect.Indirect(reflect.ValueOf(&a.ProjectID)).Set(zero)
+
+		if err = a.Reload(ctx, tx); err != nil {
+			t.Fatal("failed to reload", err)
+		}
+
+		if !queries.Equal(a.ProjectID, x.ID) {
+			t.Error("foreign key was wrong value", a.ProjectID, x.ID)
+		}
+	}
+}
+
+func testSbomToOneRemoveOpProjectUsingProject(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a Sbom
+	var b Project
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, sbomDBTypes, false, strmangle.SetComplement(sbomPrimaryKeyColumns, sbomColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &b, projectDBTypes, false, strmangle.SetComplement(projectPrimaryKeyColumns, projectColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.SetProject(ctx, tx, true, &b); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = a.RemoveProject(ctx, tx, &b); err != nil {
+		t.Error("failed to remove relationship")
+	}
+
+	count, err := a.Project().Count(ctx, tx)
+	if err != nil {
+		t.Error(err)
+	}
+	if count != 0 {
+		t.Error("want no relationships remaining")
+	}
+
+	if a.R.Project != nil {
+		t.Error("R struct entry should be nil")
+	}
+
+	if !queries.IsValuerNil(a.ProjectID) {
+		t.Error("foreign key value should be nil")
+	}
+
+	if len(b.R.Sboms) != 0 {
+		t.Error("failed to remove a from b's relationships")
+	}
+}
+
 func testSbomsReload(t *testing.T) {
 	t.Parallel()
 
@@ -568,7 +1066,7 @@ func testSbomsSelect(t *testing.T) {
 }
 
 var (
-	sbomDBTypes = map[string]string{`ID`: `uuid`, `ProjectName`: `character varying`, `Source`: `character varying`, `Sbom`: `jsonb`, `Summary`: `jsonb`, `ObjectURL`: `character varying`, `CreatedAt`: `timestamp with time zone`, `UpdatedAt`: `timestamp with time zone`}
+	sbomDBTypes = map[string]string{`ID`: `uuid`, `ProjectID`: `integer`, `ProjectName`: `character varying`, `ManifestName`: `text`, `Source`: `character varying`, `Sbom`: `jsonb`, `Summary`: `jsonb`, `ObjectURL`: `character varying`, `CreatedAt`: `timestamp with time zone`, `UpdatedAt`: `timestamp with time zone`}
 	_           = bytes.MinRead
 )
 

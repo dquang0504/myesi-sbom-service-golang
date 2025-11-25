@@ -40,7 +40,17 @@ func ParseManifest(ctx context.Context, projectName, manifestName string, manife
 
 	var out bytes.Buffer
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, "syft", tmpFile, "-o", "cyclonedx-json")
+	var cmd *exec.Cmd
+
+	// --- Detect ecosystem ---
+	switch filepath.Base(manifestName) {
+	case "pom.xml":
+		// For Maven, syft should scan the directory (not the file)
+		cmd = exec.CommandContext(ctx, "syft", "dir:"+tmpDir, "-o", "cyclonedx-json")
+	default:
+		cmd = exec.CommandContext(ctx, "syft", tmpFile, "-o", "cyclonedx-json")
+	}
+
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 
@@ -61,6 +71,13 @@ func ParseManifest(ctx context.Context, projectName, manifestName string, manife
 }
 
 func IsSupportedManifest(filename string) bool {
-	_, ok := supportedManifests[filepath.Base(filename)]
-	return ok
+	ext := filepath.Ext(filename)
+	switch ext {
+	case ".json", ".txt", ".xml", ".gradle", ".mod":
+		base := filepath.Base(filename)
+		_, ok := supportedManifests[base]
+		return ok
+	default:
+		return false
+	}
 }

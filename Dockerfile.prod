@@ -1,0 +1,35 @@
+# myesi-sbom-service-golang/Dockerfile  (PROD)
+
+# ---------- STAGE 1: Build ----------
+FROM golang:1.25-alpine AS builder 
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Swagger docs (optional)
+RUN go install github.com/swaggo/swag/cmd/swag@latest \
+    && swag init -g cmd/main.go -o docs
+
+RUN go build -o sbom-service ./cmd/main.go
+
+# ---------- STAGE 2: Production Image ----------
+FROM alpine:3.20
+
+WORKDIR /app
+
+RUN apk add --no-cache curl bash ca-certificates \
+    && curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+       | sh -s -- -b /usr/local/bin \
+    && syft version
+
+COPY --from=builder /app/sbom-service .
+
+RUN adduser -D appuser
+USER appuser
+
+EXPOSE 8002
+CMD ["./sbom-service"]
