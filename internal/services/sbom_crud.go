@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"myesi-sbom-service-golang/internal/db"
 	"myesi-sbom-service-golang/models"
 
 	null "github.com/aarondl/null/v8"
@@ -34,7 +35,7 @@ func CreateSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte
 	return sbom.ID, "create", err
 }
 
-func UpsertSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte, source, objectURL string) (string, string, error) {
+func UpsertSBOM(ctx context.Context, db *sql.DB, projectID int, projectName string, manifestName string, sbomJSON []byte, source, objectURL string) (string, string, error) {
 	//Generate summary from sbomjson
 	summary, err := ParseSBOMSummary(sbomJSON)
 	if err != nil {
@@ -43,19 +44,34 @@ func UpsertSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte
 	summaryBytes, _ := json.Marshal(summary)
 
 	//Check existing SBOM
-	existing, err := models.Sboms(qm.Where("project_name=?", project)).One(ctx, db)
+	existing, err := models.Sboms(
+		qm.Where("project_name=? AND manifest_name=?", projectName, manifestName),
+	).One(ctx, db)
+
 	if err == nil && existing != nil {
-		//Update SBOM JSON, summary, object URL, last_updated timestamp
+		existing.ProjectID = null.IntFrom(projectID)
 		existing.Sbom = sbomJSON
 		existing.ObjectURL = null.StringFrom(objectURL)
 		existing.Summary = null.JSONFrom(summaryBytes)
 		_, err := existing.Update(ctx, db, boil.Infer())
-
-		_ = UpdateProjectSBOMMeta(ctx, db, project)
 		return existing.ID, "update", err
 	}
 	//Insert if not found
-	return CreateSBOM(ctx, db, project, sbomJSON, source, objectURL)
+	// INSERT NEW
+	id := uuid.New().String()
+	sbom := &models.Sbom{
+		ID:           id,
+		ProjectID:    null.IntFrom(projectID),
+		ProjectName:  projectName,
+		ManifestName: null.StringFrom(manifestName),
+		Source:       source,
+		Sbom:         sbomJSON,
+		Summary:      null.JSONFrom(summaryBytes),
+		ObjectURL:    null.StringFrom(objectURL),
+	}
+
+	err = sbom.Insert(ctx, db, boil.Infer())
+	return sbom.ID, "create", err
 }
 
 func GetSBOM(ctx context.Context, db *sql.DB, id string) (*models.Sbom, error) {
@@ -83,4 +99,38 @@ func UpdateProjectSBOMMeta(ctx context.Context, db *sql.DB, project string) erro
 	`
 	_, err := db.ExecContext(ctx, query, project)
 	return err
+}
+
+func GetSBOMLimit(orgID int) (int, error) {
+	query := `
+        SELECT sp.sbom_limit
+        FROM organizations o
+        JOIN subscriptions s ON s.id = o.subscription_id
+        JOIN subscription_plans sp ON sp.id = s.plan_id
+        WHERE o.id = $1
+    `
+	var limit int
+	err := db.Conn.QueryRowContext(context.Background(), query, orgID).Scan(&limit)
+	if err != nil {
+		return 0, err
+	}
+
+	return limit, nil
+}
+
+func GetSBOMCount(orgID int) (int, error) {
+	query := `
+        SELECT COUNT(*)
+        FROM sboms s
+        JOIN projects p ON p.id = s.project_id
+        WHERE p.organization_id = $1
+    `
+
+	var count int
+	err := db.Conn.QueryRowContext(context.Background(), query, orgID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
 }

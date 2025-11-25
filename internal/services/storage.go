@@ -25,8 +25,8 @@ type S3Config struct {
 // UploadSBOMJSON uploads SBOM to S3. If S3 is unavailable or doesn't have configurations,
 // fallback to saving SBOM into database
 // Returns URL on S3 or DB identifier
-func UploadSBOMJSON(ctx context.Context, db *sql.DB, project string, sbomJSON []byte, summaryJSON []byte) (string, error) {
-	filename := fmt.Sprintf("sbom/%s.json", project)
+func UploadSBOMJSON(ctx context.Context, db *sql.DB, projectID int, projectName, manifestName string, sbomJSON []byte, summaryJSON []byte) (string, error) {
+	filename := fmt.Sprintf("sbom/%s.json", projectName)
 	objectURL := ""
 
 	// If S3_BUCKET isn't set, fallback to writing into DB
@@ -72,16 +72,16 @@ func UploadSBOMJSON(ctx context.Context, db *sql.DB, project string, sbomJSON []
 
 	// Save SBOM to DB (fallback or with URL if S3 upload is successful)
 	id, _ := uuid.NewV4()
-	query := `
-		INSERT INTO sboms (id, project_name, source, sbom, summary, object_url)
-		VALUES ($1, $2, $3, $4, $5, $6)
-	`
 	source := "db"
 	if objectURL != "" {
 		source = "s3"
 	}
 
-	_, err := db.ExecContext(ctx, query, id, project, source, sbomJSON, summaryJSON, objectURL)
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO sboms (
+			id, project_id, project_name, manifest_name, source, sbom, summary, object_url
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	`, id, projectID, projectName, manifestName, source, sbomJSON, summaryJSON, objectURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to save SBOM to DB: %w", err)
 	}

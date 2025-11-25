@@ -8,7 +8,16 @@ import "testing"
 // TestToOne tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToOne(t *testing.T) {
+	t.Run("OrganizationMemberToOrganizationUsingOrganization", testOrganizationMemberToOneOrganizationUsingOrganization)
+	t.Run("OrganizationMemberToUserUsingUser", testOrganizationMemberToOneUserUsingUser)
+	t.Run("ProjectToUserUsingCreatedByUser", testProjectToOneUserUsingCreatedByUser)
+	t.Run("ProjectToOrganizationUsingOrganization", testProjectToOneOrganizationUsingOrganization)
 	t.Run("ProjectToUserUsingOwner", testProjectToOneUserUsingOwner)
+	t.Run("SbomToProjectUsingProject", testSbomToOneProjectUsingProject)
+	t.Run("ScanJobToProjectUsingProject", testScanJobToOneProjectUsingProject)
+	t.Run("ScanJobToSbomUsingSbom", testScanJobToOneSbomUsingSbom)
+	t.Run("ScanJobToUserUsingTriggeredByUser", testScanJobToOneUserUsingTriggeredByUser)
+	t.Run("UserToOrganizationUsingOrganization", testUserToOneOrganizationUsingOrganization)
 }
 
 // TestOneToOne tests cannot be run in parallel
@@ -18,19 +27,46 @@ func TestOneToOne(t *testing.T) {}
 // TestToMany tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToMany(t *testing.T) {
+	t.Run("OrganizationToOrganizationMembers", testOrganizationToManyOrganizationMembers)
+	t.Run("OrganizationToProjects", testOrganizationToManyProjects)
+	t.Run("OrganizationToUsers", testOrganizationToManyUsers)
+	t.Run("ProjectToSboms", testProjectToManySboms)
+	t.Run("ProjectToScanJobs", testProjectToManyScanJobs)
+	t.Run("SbomToScanJobs", testSbomToManyScanJobs)
+	t.Run("UserToOrganizationMembers", testUserToManyOrganizationMembers)
+	t.Run("UserToCreatedByProjects", testUserToManyCreatedByProjects)
 	t.Run("UserToOwnerProjects", testUserToManyOwnerProjects)
+	t.Run("UserToTriggeredByScanJobs", testUserToManyTriggeredByScanJobs)
 }
 
 // TestToOneSet tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToOneSet(t *testing.T) {
+	t.Run("OrganizationMemberToOrganizationUsingOrganizationMembers", testOrganizationMemberToOneSetOpOrganizationUsingOrganization)
+	t.Run("OrganizationMemberToUserUsingOrganizationMembers", testOrganizationMemberToOneSetOpUserUsingUser)
+	t.Run("ProjectToUserUsingCreatedByProjects", testProjectToOneSetOpUserUsingCreatedByUser)
+	t.Run("ProjectToOrganizationUsingProjects", testProjectToOneSetOpOrganizationUsingOrganization)
 	t.Run("ProjectToUserUsingOwnerProjects", testProjectToOneSetOpUserUsingOwner)
+	t.Run("SbomToProjectUsingSboms", testSbomToOneSetOpProjectUsingProject)
+	t.Run("ScanJobToProjectUsingScanJobs", testScanJobToOneSetOpProjectUsingProject)
+	t.Run("ScanJobToSbomUsingScanJobs", testScanJobToOneSetOpSbomUsingSbom)
+	t.Run("ScanJobToUserUsingTriggeredByScanJobs", testScanJobToOneSetOpUserUsingTriggeredByUser)
+	t.Run("UserToOrganizationUsingUsers", testUserToOneSetOpOrganizationUsingOrganization)
 }
 
 // TestToOneRemove tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToOneRemove(t *testing.T) {
+	t.Run("OrganizationMemberToOrganizationUsingOrganizationMembers", testOrganizationMemberToOneRemoveOpOrganizationUsingOrganization)
+	t.Run("OrganizationMemberToUserUsingOrganizationMembers", testOrganizationMemberToOneRemoveOpUserUsingUser)
+	t.Run("ProjectToUserUsingCreatedByProjects", testProjectToOneRemoveOpUserUsingCreatedByUser)
+	t.Run("ProjectToOrganizationUsingProjects", testProjectToOneRemoveOpOrganizationUsingOrganization)
 	t.Run("ProjectToUserUsingOwnerProjects", testProjectToOneRemoveOpUserUsingOwner)
+	t.Run("SbomToProjectUsingSboms", testSbomToOneRemoveOpProjectUsingProject)
+	t.Run("ScanJobToProjectUsingScanJobs", testScanJobToOneRemoveOpProjectUsingProject)
+	t.Run("ScanJobToSbomUsingScanJobs", testScanJobToOneRemoveOpSbomUsingSbom)
+	t.Run("ScanJobToUserUsingTriggeredByScanJobs", testScanJobToOneRemoveOpUserUsingTriggeredByUser)
+	t.Run("UserToOrganizationUsingUsers", testUserToOneRemoveOpOrganizationUsingOrganization)
 }
 
 // TestOneToOneSet tests cannot be run in parallel
@@ -44,17 +80,44 @@ func TestOneToOneRemove(t *testing.T) {}
 // TestToManyAdd tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToManyAdd(t *testing.T) {
+	t.Run("OrganizationToOrganizationMembers", testOrganizationToManyAddOpOrganizationMembers)
+	t.Run("OrganizationToProjects", testOrganizationToManyAddOpProjects)
+	t.Run("OrganizationToUsers", testOrganizationToManyAddOpUsers)
+	t.Run("ProjectToSboms", testProjectToManyAddOpSboms)
+	t.Run("ProjectToScanJobs", testProjectToManyAddOpScanJobs)
+	t.Run("SbomToScanJobs", testSbomToManyAddOpScanJobs)
+	t.Run("UserToOrganizationMembers", testUserToManyAddOpOrganizationMembers)
+	t.Run("UserToCreatedByProjects", testUserToManyAddOpCreatedByProjects)
 	t.Run("UserToOwnerProjects", testUserToManyAddOpOwnerProjects)
+	t.Run("UserToTriggeredByScanJobs", testUserToManyAddOpTriggeredByScanJobs)
 }
 
 // TestToManySet tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToManySet(t *testing.T) {
+	t.Run("OrganizationToOrganizationMembers", testOrganizationToManySetOpOrganizationMembers)
+	t.Run("OrganizationToProjects", testOrganizationToManySetOpProjects)
+	t.Run("OrganizationToUsers", testOrganizationToManySetOpUsers)
+	t.Run("ProjectToSboms", testProjectToManySetOpSboms)
+	t.Run("ProjectToScanJobs", testProjectToManySetOpScanJobs)
+	t.Run("SbomToScanJobs", testSbomToManySetOpScanJobs)
+	t.Run("UserToOrganizationMembers", testUserToManySetOpOrganizationMembers)
+	t.Run("UserToCreatedByProjects", testUserToManySetOpCreatedByProjects)
 	t.Run("UserToOwnerProjects", testUserToManySetOpOwnerProjects)
+	t.Run("UserToTriggeredByScanJobs", testUserToManySetOpTriggeredByScanJobs)
 }
 
 // TestToManyRemove tests cannot be run in parallel
 // or deadlocks can occur.
 func TestToManyRemove(t *testing.T) {
+	t.Run("OrganizationToOrganizationMembers", testOrganizationToManyRemoveOpOrganizationMembers)
+	t.Run("OrganizationToProjects", testOrganizationToManyRemoveOpProjects)
+	t.Run("OrganizationToUsers", testOrganizationToManyRemoveOpUsers)
+	t.Run("ProjectToSboms", testProjectToManyRemoveOpSboms)
+	t.Run("ProjectToScanJobs", testProjectToManyRemoveOpScanJobs)
+	t.Run("SbomToScanJobs", testSbomToManyRemoveOpScanJobs)
+	t.Run("UserToOrganizationMembers", testUserToManyRemoveOpOrganizationMembers)
+	t.Run("UserToCreatedByProjects", testUserToManyRemoveOpCreatedByProjects)
 	t.Run("UserToOwnerProjects", testUserToManyRemoveOpOwnerProjects)
+	t.Run("UserToTriggeredByScanJobs", testUserToManyRemoveOpTriggeredByScanJobs)
 }
