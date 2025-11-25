@@ -7,6 +7,7 @@ import (
 	v1 "myesi-sbom-service-golang/internal/api/v1"
 	"myesi-sbom-service-golang/internal/config"
 	"myesi-sbom-service-golang/internal/db"
+	"myesi-sbom-service-golang/internal/services"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,6 +34,8 @@ func main() {
 
 	projectsGroup := api.Group("/projects")
 	v1.RegisterProjectRoutes(projectsGroup)
+
+	go services.StartCodeScanConsumer()
 
 	app.Get("/swagger/*", fiberSwagger.HandlerDefault) // Swagger UI endpoint
 	log.Println("SBOM service listening on port 8002")

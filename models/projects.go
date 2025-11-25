@@ -29,12 +29,28 @@ type Project struct {
 	Name                 string            `boil:"name" json:"name" toml:"name" yaml:"name"`
 	Description          null.String       `boil:"description" json:"description,omitempty" toml:"description" yaml:"description,omitempty"`
 	OwnerID              null.Int          `boil:"owner_id" json:"owner_id,omitempty" toml:"owner_id" yaml:"owner_id,omitempty"`
+	OrganizationID       null.Int          `boil:"organization_id" json:"organization_id,omitempty" toml:"organization_id" yaml:"organization_id,omitempty"`
+	CreatedBy            null.Int          `boil:"created_by" json:"created_by,omitempty" toml:"created_by" yaml:"created_by,omitempty"`
+	SourceType           null.String       `boil:"source_type" json:"source_type,omitempty" toml:"source_type" yaml:"source_type,omitempty"`
 	RepoURL              null.String       `boil:"repo_url" json:"repo_url,omitempty" toml:"repo_url" yaml:"repo_url,omitempty"`
+	GithubRepoID         null.Int64        `boil:"github_repo_id" json:"github_repo_id,omitempty" toml:"github_repo_id" yaml:"github_repo_id,omitempty"`
+	GithubFullName       null.String       `boil:"github_full_name" json:"github_full_name,omitempty" toml:"github_full_name" yaml:"github_full_name,omitempty"`
+	GithubVisibility     null.String       `boil:"github_visibility" json:"github_visibility,omitempty" toml:"github_visibility" yaml:"github_visibility,omitempty"`
+	GithubDefaultBranch  null.String       `boil:"github_default_branch" json:"github_default_branch,omitempty" toml:"github_default_branch" yaml:"github_default_branch,omitempty"`
+	GithubLanguage       null.JSON         `boil:"github_language" json:"github_language,omitempty" toml:"github_language" yaml:"github_language,omitempty"`
+	StargazersCount      null.Int          `boil:"stargazers_count" json:"stargazers_count,omitempty" toml:"stargazers_count" yaml:"stargazers_count,omitempty"`
+	ForksCount           null.Int          `boil:"forks_count" json:"forks_count,omitempty" toml:"forks_count" yaml:"forks_count,omitempty"`
+	IsFork               null.Bool         `boil:"is_fork" json:"is_fork,omitempty" toml:"is_fork" yaml:"is_fork,omitempty"`
+	GithubLastSync       null.Time         `boil:"github_last_sync" json:"github_last_sync,omitempty" toml:"github_last_sync" yaml:"github_last_sync,omitempty"`
+	LastSyncError        null.String       `boil:"last_sync_error" json:"last_sync_error,omitempty" toml:"last_sync_error" yaml:"last_sync_error,omitempty"`
+	ImportStatus         null.String       `boil:"import_status" json:"import_status,omitempty" toml:"import_status" yaml:"import_status,omitempty"`
+	ScanStatus           null.String       `boil:"scan_status" json:"scan_status,omitempty" toml:"scan_status" yaml:"scan_status,omitempty"`
 	LastSbomUpload       null.Time         `boil:"last_sbom_upload" json:"last_sbom_upload,omitempty" toml:"last_sbom_upload" yaml:"last_sbom_upload,omitempty"`
 	LastVulnScan         null.Time         `boil:"last_vuln_scan" json:"last_vuln_scan,omitempty" toml:"last_vuln_scan" yaml:"last_vuln_scan,omitempty"`
 	AvgRiskScore         types.NullDecimal `boil:"avg_risk_score" json:"avg_risk_score,omitempty" toml:"avg_risk_score" yaml:"avg_risk_score,omitempty"`
 	TotalVulnerabilities null.Int          `boil:"total_vulnerabilities" json:"total_vulnerabilities,omitempty" toml:"total_vulnerabilities" yaml:"total_vulnerabilities,omitempty"`
 	CreatedAt            null.Time         `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
+	UpdatedAt            null.Time         `boil:"updated_at" json:"updated_at,omitempty" toml:"updated_at" yaml:"updated_at,omitempty"`
 
 	R *projectR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L projectL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -45,23 +61,55 @@ var ProjectColumns = struct {
 	Name                 string
 	Description          string
 	OwnerID              string
+	OrganizationID       string
+	CreatedBy            string
+	SourceType           string
 	RepoURL              string
+	GithubRepoID         string
+	GithubFullName       string
+	GithubVisibility     string
+	GithubDefaultBranch  string
+	GithubLanguage       string
+	StargazersCount      string
+	ForksCount           string
+	IsFork               string
+	GithubLastSync       string
+	LastSyncError        string
+	ImportStatus         string
+	ScanStatus           string
 	LastSbomUpload       string
 	LastVulnScan         string
 	AvgRiskScore         string
 	TotalVulnerabilities string
 	CreatedAt            string
+	UpdatedAt            string
 }{
 	ID:                   "id",
 	Name:                 "name",
 	Description:          "description",
 	OwnerID:              "owner_id",
+	OrganizationID:       "organization_id",
+	CreatedBy:            "created_by",
+	SourceType:           "source_type",
 	RepoURL:              "repo_url",
+	GithubRepoID:         "github_repo_id",
+	GithubFullName:       "github_full_name",
+	GithubVisibility:     "github_visibility",
+	GithubDefaultBranch:  "github_default_branch",
+	GithubLanguage:       "github_language",
+	StargazersCount:      "stargazers_count",
+	ForksCount:           "forks_count",
+	IsFork:               "is_fork",
+	GithubLastSync:       "github_last_sync",
+	LastSyncError:        "last_sync_error",
+	ImportStatus:         "import_status",
+	ScanStatus:           "scan_status",
 	LastSbomUpload:       "last_sbom_upload",
 	LastVulnScan:         "last_vuln_scan",
 	AvgRiskScore:         "avg_risk_score",
 	TotalVulnerabilities: "total_vulnerabilities",
 	CreatedAt:            "created_at",
+	UpdatedAt:            "updated_at",
 }
 
 var ProjectTableColumns = struct {
@@ -69,43 +117,87 @@ var ProjectTableColumns = struct {
 	Name                 string
 	Description          string
 	OwnerID              string
+	OrganizationID       string
+	CreatedBy            string
+	SourceType           string
 	RepoURL              string
+	GithubRepoID         string
+	GithubFullName       string
+	GithubVisibility     string
+	GithubDefaultBranch  string
+	GithubLanguage       string
+	StargazersCount      string
+	ForksCount           string
+	IsFork               string
+	GithubLastSync       string
+	LastSyncError        string
+	ImportStatus         string
+	ScanStatus           string
 	LastSbomUpload       string
 	LastVulnScan         string
 	AvgRiskScore         string
 	TotalVulnerabilities string
 	CreatedAt            string
+	UpdatedAt            string
 }{
 	ID:                   "projects.id",
 	Name:                 "projects.name",
 	Description:          "projects.description",
 	OwnerID:              "projects.owner_id",
+	OrganizationID:       "projects.organization_id",
+	CreatedBy:            "projects.created_by",
+	SourceType:           "projects.source_type",
 	RepoURL:              "projects.repo_url",
+	GithubRepoID:         "projects.github_repo_id",
+	GithubFullName:       "projects.github_full_name",
+	GithubVisibility:     "projects.github_visibility",
+	GithubDefaultBranch:  "projects.github_default_branch",
+	GithubLanguage:       "projects.github_language",
+	StargazersCount:      "projects.stargazers_count",
+	ForksCount:           "projects.forks_count",
+	IsFork:               "projects.is_fork",
+	GithubLastSync:       "projects.github_last_sync",
+	LastSyncError:        "projects.last_sync_error",
+	ImportStatus:         "projects.import_status",
+	ScanStatus:           "projects.scan_status",
 	LastSbomUpload:       "projects.last_sbom_upload",
 	LastVulnScan:         "projects.last_vuln_scan",
 	AvgRiskScore:         "projects.avg_risk_score",
 	TotalVulnerabilities: "projects.total_vulnerabilities",
 	CreatedAt:            "projects.created_at",
+	UpdatedAt:            "projects.updated_at",
 }
 
 // Generated where
 
-type whereHelperint struct{ field string }
+type whereHelpernull_Int64 struct{ field string }
 
-func (w whereHelperint) EQ(x int) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.EQ, x) }
-func (w whereHelperint) NEQ(x int) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.NEQ, x) }
-func (w whereHelperint) LT(x int) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.LT, x) }
-func (w whereHelperint) LTE(x int) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.LTE, x) }
-func (w whereHelperint) GT(x int) qm.QueryMod  { return qmhelper.Where(w.field, qmhelper.GT, x) }
-func (w whereHelperint) GTE(x int) qm.QueryMod { return qmhelper.Where(w.field, qmhelper.GTE, x) }
-func (w whereHelperint) IN(slice []int) qm.QueryMod {
+func (w whereHelpernull_Int64) EQ(x null.Int64) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, false, x)
+}
+func (w whereHelpernull_Int64) NEQ(x null.Int64) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, true, x)
+}
+func (w whereHelpernull_Int64) LT(x null.Int64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelpernull_Int64) LTE(x null.Int64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelpernull_Int64) GT(x null.Int64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelpernull_Int64) GTE(x null.Int64) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+func (w whereHelpernull_Int64) IN(slice []int64) qm.QueryMod {
 	values := make([]interface{}, 0, len(slice))
 	for _, value := range slice {
 		values = append(values, value)
 	}
 	return qm.WhereIn(fmt.Sprintf("%s IN ?", w.field), values...)
 }
-func (w whereHelperint) NIN(slice []int) qm.QueryMod {
+func (w whereHelpernull_Int64) NIN(slice []int64) qm.QueryMod {
 	values := make([]interface{}, 0, len(slice))
 	for _, value := range slice {
 		values = append(values, value)
@@ -113,123 +205,56 @@ func (w whereHelperint) NIN(slice []int) qm.QueryMod {
 	return qm.WhereNotIn(fmt.Sprintf("%s NOT IN ?", w.field), values...)
 }
 
-type whereHelpernull_String struct{ field string }
+func (w whereHelpernull_Int64) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
+func (w whereHelpernull_Int64) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
 
-func (w whereHelpernull_String) EQ(x null.String) qm.QueryMod {
+type whereHelpernull_JSON struct{ field string }
+
+func (w whereHelpernull_JSON) EQ(x null.JSON) qm.QueryMod {
 	return qmhelper.WhereNullEQ(w.field, false, x)
 }
-func (w whereHelpernull_String) NEQ(x null.String) qm.QueryMod {
+func (w whereHelpernull_JSON) NEQ(x null.JSON) qm.QueryMod {
 	return qmhelper.WhereNullEQ(w.field, true, x)
 }
-func (w whereHelpernull_String) LT(x null.String) qm.QueryMod {
+func (w whereHelpernull_JSON) LT(x null.JSON) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.LT, x)
 }
-func (w whereHelpernull_String) LTE(x null.String) qm.QueryMod {
+func (w whereHelpernull_JSON) LTE(x null.JSON) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.LTE, x)
 }
-func (w whereHelpernull_String) GT(x null.String) qm.QueryMod {
+func (w whereHelpernull_JSON) GT(x null.JSON) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GT, x)
 }
-func (w whereHelpernull_String) GTE(x null.String) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
-func (w whereHelpernull_String) LIKE(x null.String) qm.QueryMod {
-	return qm.Where(w.field+" LIKE ?", x)
-}
-func (w whereHelpernull_String) NLIKE(x null.String) qm.QueryMod {
-	return qm.Where(w.field+" NOT LIKE ?", x)
-}
-func (w whereHelpernull_String) ILIKE(x null.String) qm.QueryMod {
-	return qm.Where(w.field+" ILIKE ?", x)
-}
-func (w whereHelpernull_String) NILIKE(x null.String) qm.QueryMod {
-	return qm.Where(w.field+" NOT ILIKE ?", x)
-}
-func (w whereHelpernull_String) SIMILAR(x null.String) qm.QueryMod {
-	return qm.Where(w.field+" SIMILAR TO ?", x)
-}
-func (w whereHelpernull_String) NSIMILAR(x null.String) qm.QueryMod {
-	return qm.Where(w.field+" NOT SIMILAR TO ?", x)
-}
-func (w whereHelpernull_String) IN(slice []string) qm.QueryMod {
-	values := make([]interface{}, 0, len(slice))
-	for _, value := range slice {
-		values = append(values, value)
-	}
-	return qm.WhereIn(fmt.Sprintf("%s IN ?", w.field), values...)
-}
-func (w whereHelpernull_String) NIN(slice []string) qm.QueryMod {
-	values := make([]interface{}, 0, len(slice))
-	for _, value := range slice {
-		values = append(values, value)
-	}
-	return qm.WhereNotIn(fmt.Sprintf("%s NOT IN ?", w.field), values...)
-}
-
-func (w whereHelpernull_String) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_String) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
-
-type whereHelpernull_Int struct{ field string }
-
-func (w whereHelpernull_Int) EQ(x null.Int) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, false, x)
-}
-func (w whereHelpernull_Int) NEQ(x null.Int) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, true, x)
-}
-func (w whereHelpernull_Int) LT(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpernull_Int) LTE(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpernull_Int) GT(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpernull_Int) GTE(x null.Int) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
-func (w whereHelpernull_Int) IN(slice []int) qm.QueryMod {
-	values := make([]interface{}, 0, len(slice))
-	for _, value := range slice {
-		values = append(values, value)
-	}
-	return qm.WhereIn(fmt.Sprintf("%s IN ?", w.field), values...)
-}
-func (w whereHelpernull_Int) NIN(slice []int) qm.QueryMod {
-	values := make([]interface{}, 0, len(slice))
-	for _, value := range slice {
-		values = append(values, value)
-	}
-	return qm.WhereNotIn(fmt.Sprintf("%s NOT IN ?", w.field), values...)
-}
-
-func (w whereHelpernull_Int) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_Int) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
-
-type whereHelpernull_Time struct{ field string }
-
-func (w whereHelpernull_Time) EQ(x null.Time) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, false, x)
-}
-func (w whereHelpernull_Time) NEQ(x null.Time) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, true, x)
-}
-func (w whereHelpernull_Time) LT(x null.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpernull_Time) LTE(x null.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpernull_Time) GT(x null.Time) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpernull_Time) GTE(x null.Time) qm.QueryMod {
+func (w whereHelpernull_JSON) GTE(x null.JSON) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GTE, x)
 }
 
-func (w whereHelpernull_Time) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_Time) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
+func (w whereHelpernull_JSON) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
+func (w whereHelpernull_JSON) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
+
+type whereHelpernull_Bool struct{ field string }
+
+func (w whereHelpernull_Bool) EQ(x null.Bool) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, false, x)
+}
+func (w whereHelpernull_Bool) NEQ(x null.Bool) qm.QueryMod {
+	return qmhelper.WhereNullEQ(w.field, true, x)
+}
+func (w whereHelpernull_Bool) LT(x null.Bool) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelpernull_Bool) LTE(x null.Bool) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelpernull_Bool) GT(x null.Bool) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelpernull_Bool) GTE(x null.Bool) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
+
+func (w whereHelpernull_Bool) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
+func (w whereHelpernull_Bool) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
 
 type whereHelpertypes_NullDecimal struct{ field string }
 
@@ -262,40 +287,116 @@ var ProjectWhere = struct {
 	Name                 whereHelperstring
 	Description          whereHelpernull_String
 	OwnerID              whereHelpernull_Int
+	OrganizationID       whereHelpernull_Int
+	CreatedBy            whereHelpernull_Int
+	SourceType           whereHelpernull_String
 	RepoURL              whereHelpernull_String
+	GithubRepoID         whereHelpernull_Int64
+	GithubFullName       whereHelpernull_String
+	GithubVisibility     whereHelpernull_String
+	GithubDefaultBranch  whereHelpernull_String
+	GithubLanguage       whereHelpernull_JSON
+	StargazersCount      whereHelpernull_Int
+	ForksCount           whereHelpernull_Int
+	IsFork               whereHelpernull_Bool
+	GithubLastSync       whereHelpernull_Time
+	LastSyncError        whereHelpernull_String
+	ImportStatus         whereHelpernull_String
+	ScanStatus           whereHelpernull_String
 	LastSbomUpload       whereHelpernull_Time
 	LastVulnScan         whereHelpernull_Time
 	AvgRiskScore         whereHelpertypes_NullDecimal
 	TotalVulnerabilities whereHelpernull_Int
 	CreatedAt            whereHelpernull_Time
+	UpdatedAt            whereHelpernull_Time
 }{
 	ID:                   whereHelperint{field: "\"projects\".\"id\""},
 	Name:                 whereHelperstring{field: "\"projects\".\"name\""},
 	Description:          whereHelpernull_String{field: "\"projects\".\"description\""},
 	OwnerID:              whereHelpernull_Int{field: "\"projects\".\"owner_id\""},
+	OrganizationID:       whereHelpernull_Int{field: "\"projects\".\"organization_id\""},
+	CreatedBy:            whereHelpernull_Int{field: "\"projects\".\"created_by\""},
+	SourceType:           whereHelpernull_String{field: "\"projects\".\"source_type\""},
 	RepoURL:              whereHelpernull_String{field: "\"projects\".\"repo_url\""},
+	GithubRepoID:         whereHelpernull_Int64{field: "\"projects\".\"github_repo_id\""},
+	GithubFullName:       whereHelpernull_String{field: "\"projects\".\"github_full_name\""},
+	GithubVisibility:     whereHelpernull_String{field: "\"projects\".\"github_visibility\""},
+	GithubDefaultBranch:  whereHelpernull_String{field: "\"projects\".\"github_default_branch\""},
+	GithubLanguage:       whereHelpernull_JSON{field: "\"projects\".\"github_language\""},
+	StargazersCount:      whereHelpernull_Int{field: "\"projects\".\"stargazers_count\""},
+	ForksCount:           whereHelpernull_Int{field: "\"projects\".\"forks_count\""},
+	IsFork:               whereHelpernull_Bool{field: "\"projects\".\"is_fork\""},
+	GithubLastSync:       whereHelpernull_Time{field: "\"projects\".\"github_last_sync\""},
+	LastSyncError:        whereHelpernull_String{field: "\"projects\".\"last_sync_error\""},
+	ImportStatus:         whereHelpernull_String{field: "\"projects\".\"import_status\""},
+	ScanStatus:           whereHelpernull_String{field: "\"projects\".\"scan_status\""},
 	LastSbomUpload:       whereHelpernull_Time{field: "\"projects\".\"last_sbom_upload\""},
 	LastVulnScan:         whereHelpernull_Time{field: "\"projects\".\"last_vuln_scan\""},
 	AvgRiskScore:         whereHelpertypes_NullDecimal{field: "\"projects\".\"avg_risk_score\""},
 	TotalVulnerabilities: whereHelpernull_Int{field: "\"projects\".\"total_vulnerabilities\""},
 	CreatedAt:            whereHelpernull_Time{field: "\"projects\".\"created_at\""},
+	UpdatedAt:            whereHelpernull_Time{field: "\"projects\".\"updated_at\""},
 }
 
 // ProjectRels is where relationship names are stored.
 var ProjectRels = struct {
-	Owner string
+	CreatedByUser string
+	Organization  string
+	Owner         string
+	Sboms         string
+	ScanJobs      string
 }{
-	Owner: "Owner",
+	CreatedByUser: "CreatedByUser",
+	Organization:  "Organization",
+	Owner:         "Owner",
+	Sboms:         "Sboms",
+	ScanJobs:      "ScanJobs",
 }
 
 // projectR is where relationships are stored.
 type projectR struct {
-	Owner *User `boil:"Owner" json:"Owner" toml:"Owner" yaml:"Owner"`
+	CreatedByUser *User         `boil:"CreatedByUser" json:"CreatedByUser" toml:"CreatedByUser" yaml:"CreatedByUser"`
+	Organization  *Organization `boil:"Organization" json:"Organization" toml:"Organization" yaml:"Organization"`
+	Owner         *User         `boil:"Owner" json:"Owner" toml:"Owner" yaml:"Owner"`
+	Sboms         SbomSlice     `boil:"Sboms" json:"Sboms" toml:"Sboms" yaml:"Sboms"`
+	ScanJobs      ScanJobSlice  `boil:"ScanJobs" json:"ScanJobs" toml:"ScanJobs" yaml:"ScanJobs"`
 }
 
 // NewStruct creates a new relationship struct
 func (*projectR) NewStruct() *projectR {
 	return &projectR{}
+}
+
+func (o *Project) GetCreatedByUser() *User {
+	if o == nil {
+		return nil
+	}
+
+	return o.R.GetCreatedByUser()
+}
+
+func (r *projectR) GetCreatedByUser() *User {
+	if r == nil {
+		return nil
+	}
+
+	return r.CreatedByUser
+}
+
+func (o *Project) GetOrganization() *Organization {
+	if o == nil {
+		return nil
+	}
+
+	return o.R.GetOrganization()
+}
+
+func (r *projectR) GetOrganization() *Organization {
+	if r == nil {
+		return nil
+	}
+
+	return r.Organization
 }
 
 func (o *Project) GetOwner() *User {
@@ -314,13 +415,45 @@ func (r *projectR) GetOwner() *User {
 	return r.Owner
 }
 
+func (o *Project) GetSboms() SbomSlice {
+	if o == nil {
+		return nil
+	}
+
+	return o.R.GetSboms()
+}
+
+func (r *projectR) GetSboms() SbomSlice {
+	if r == nil {
+		return nil
+	}
+
+	return r.Sboms
+}
+
+func (o *Project) GetScanJobs() ScanJobSlice {
+	if o == nil {
+		return nil
+	}
+
+	return o.R.GetScanJobs()
+}
+
+func (r *projectR) GetScanJobs() ScanJobSlice {
+	if r == nil {
+		return nil
+	}
+
+	return r.ScanJobs
+}
+
 // projectL is where Load methods for each relationship are stored.
 type projectL struct{}
 
 var (
-	projectAllColumns            = []string{"id", "name", "description", "owner_id", "repo_url", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at"}
+	projectAllColumns            = []string{"id", "name", "description", "owner_id", "organization_id", "created_by", "source_type", "repo_url", "github_repo_id", "github_full_name", "github_visibility", "github_default_branch", "github_language", "stargazers_count", "forks_count", "is_fork", "github_last_sync", "last_sync_error", "import_status", "scan_status", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at", "updated_at"}
 	projectColumnsWithoutDefault = []string{"name"}
-	projectColumnsWithDefault    = []string{"id", "description", "owner_id", "repo_url", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at"}
+	projectColumnsWithDefault    = []string{"id", "description", "owner_id", "organization_id", "created_by", "source_type", "repo_url", "github_repo_id", "github_full_name", "github_visibility", "github_default_branch", "github_language", "stargazers_count", "forks_count", "is_fork", "github_last_sync", "last_sync_error", "import_status", "scan_status", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at", "updated_at"}
 	projectPrimaryKeyColumns     = []string{"id"}
 	projectGeneratedColumns      = []string{}
 )
@@ -630,6 +763,28 @@ func (q projectQuery) Exists(ctx context.Context, exec boil.ContextExecutor) (bo
 	return count > 0, nil
 }
 
+// CreatedByUser pointed to by the foreign key.
+func (o *Project) CreatedByUser(mods ...qm.QueryMod) userQuery {
+	queryMods := []qm.QueryMod{
+		qm.Where("\"id\" = ?", o.CreatedBy),
+	}
+
+	queryMods = append(queryMods, mods...)
+
+	return Users(queryMods...)
+}
+
+// Organization pointed to by the foreign key.
+func (o *Project) Organization(mods ...qm.QueryMod) organizationQuery {
+	queryMods := []qm.QueryMod{
+		qm.Where("\"id\" = ?", o.OrganizationID),
+	}
+
+	queryMods = append(queryMods, mods...)
+
+	return Organizations(queryMods...)
+}
+
 // Owner pointed to by the foreign key.
 func (o *Project) Owner(mods ...qm.QueryMod) userQuery {
 	queryMods := []qm.QueryMod{
@@ -639,6 +794,282 @@ func (o *Project) Owner(mods ...qm.QueryMod) userQuery {
 	queryMods = append(queryMods, mods...)
 
 	return Users(queryMods...)
+}
+
+// Sboms retrieves all the sbom's Sboms with an executor.
+func (o *Project) Sboms(mods ...qm.QueryMod) sbomQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"sboms\".\"project_id\"=?", o.ID),
+	)
+
+	return Sboms(queryMods...)
+}
+
+// ScanJobs retrieves all the scan_job's ScanJobs with an executor.
+func (o *Project) ScanJobs(mods ...qm.QueryMod) scanJobQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"scan_jobs\".\"project_id\"=?", o.ID),
+	)
+
+	return ScanJobs(queryMods...)
+}
+
+// LoadCreatedByUser allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for an N-1 relationship.
+func (projectL) LoadCreatedByUser(ctx context.Context, e boil.ContextExecutor, singular bool, maybeProject interface{}, mods queries.Applicator) error {
+	var slice []*Project
+	var object *Project
+
+	if singular {
+		var ok bool
+		object, ok = maybeProject.(*Project)
+		if !ok {
+			object = new(Project)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeProject))
+			}
+		}
+	} else {
+		s, ok := maybeProject.(*[]*Project)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeProject))
+			}
+		}
+	}
+
+	args := make(map[interface{}]struct{})
+	if singular {
+		if object.R == nil {
+			object.R = &projectR{}
+		}
+		if !queries.IsNil(object.CreatedBy) {
+			args[object.CreatedBy] = struct{}{}
+		}
+
+	} else {
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &projectR{}
+			}
+
+			if !queries.IsNil(obj.CreatedBy) {
+				args[obj.CreatedBy] = struct{}{}
+			}
+
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	argsSlice := make([]interface{}, len(args))
+	i := 0
+	for arg := range args {
+		argsSlice[i] = arg
+		i++
+	}
+
+	query := NewQuery(
+		qm.From(`users`),
+		qm.WhereIn(`users.id in ?`, argsSlice...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load User")
+	}
+
+	var resultSlice []*User
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice User")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results of eager load for users")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for users")
+	}
+
+	if len(userAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(resultSlice) == 0 {
+		return nil
+	}
+
+	if singular {
+		foreign := resultSlice[0]
+		object.R.CreatedByUser = foreign
+		if foreign.R == nil {
+			foreign.R = &userR{}
+		}
+		foreign.R.CreatedByProjects = append(foreign.R.CreatedByProjects, object)
+		return nil
+	}
+
+	for _, local := range slice {
+		for _, foreign := range resultSlice {
+			if queries.Equal(local.CreatedBy, foreign.ID) {
+				local.R.CreatedByUser = foreign
+				if foreign.R == nil {
+					foreign.R = &userR{}
+				}
+				foreign.R.CreatedByProjects = append(foreign.R.CreatedByProjects, local)
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadOrganization allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for an N-1 relationship.
+func (projectL) LoadOrganization(ctx context.Context, e boil.ContextExecutor, singular bool, maybeProject interface{}, mods queries.Applicator) error {
+	var slice []*Project
+	var object *Project
+
+	if singular {
+		var ok bool
+		object, ok = maybeProject.(*Project)
+		if !ok {
+			object = new(Project)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeProject))
+			}
+		}
+	} else {
+		s, ok := maybeProject.(*[]*Project)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeProject))
+			}
+		}
+	}
+
+	args := make(map[interface{}]struct{})
+	if singular {
+		if object.R == nil {
+			object.R = &projectR{}
+		}
+		if !queries.IsNil(object.OrganizationID) {
+			args[object.OrganizationID] = struct{}{}
+		}
+
+	} else {
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &projectR{}
+			}
+
+			if !queries.IsNil(obj.OrganizationID) {
+				args[obj.OrganizationID] = struct{}{}
+			}
+
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	argsSlice := make([]interface{}, len(args))
+	i := 0
+	for arg := range args {
+		argsSlice[i] = arg
+		i++
+	}
+
+	query := NewQuery(
+		qm.From(`organizations`),
+		qm.WhereIn(`organizations.id in ?`, argsSlice...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load Organization")
+	}
+
+	var resultSlice []*Organization
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice Organization")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results of eager load for organizations")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for organizations")
+	}
+
+	if len(organizationAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+
+	if len(resultSlice) == 0 {
+		return nil
+	}
+
+	if singular {
+		foreign := resultSlice[0]
+		object.R.Organization = foreign
+		if foreign.R == nil {
+			foreign.R = &organizationR{}
+		}
+		foreign.R.Projects = append(foreign.R.Projects, object)
+		return nil
+	}
+
+	for _, local := range slice {
+		for _, foreign := range resultSlice {
+			if queries.Equal(local.OrganizationID, foreign.ID) {
+				local.R.Organization = foreign
+				if foreign.R == nil {
+					foreign.R = &organizationR{}
+				}
+				foreign.R.Projects = append(foreign.R.Projects, local)
+				break
+			}
+		}
+	}
+
+	return nil
 }
 
 // LoadOwner allows an eager lookup of values, cached into the
@@ -765,6 +1196,392 @@ func (projectL) LoadOwner(ctx context.Context, e boil.ContextExecutor, singular 
 	return nil
 }
 
+// LoadSboms allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (projectL) LoadSboms(ctx context.Context, e boil.ContextExecutor, singular bool, maybeProject interface{}, mods queries.Applicator) error {
+	var slice []*Project
+	var object *Project
+
+	if singular {
+		var ok bool
+		object, ok = maybeProject.(*Project)
+		if !ok {
+			object = new(Project)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeProject))
+			}
+		}
+	} else {
+		s, ok := maybeProject.(*[]*Project)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeProject))
+			}
+		}
+	}
+
+	args := make(map[interface{}]struct{})
+	if singular {
+		if object.R == nil {
+			object.R = &projectR{}
+		}
+		args[object.ID] = struct{}{}
+	} else {
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &projectR{}
+			}
+			args[obj.ID] = struct{}{}
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	argsSlice := make([]interface{}, len(args))
+	i := 0
+	for arg := range args {
+		argsSlice[i] = arg
+		i++
+	}
+
+	query := NewQuery(
+		qm.From(`sboms`),
+		qm.WhereIn(`sboms.project_id in ?`, argsSlice...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load sboms")
+	}
+
+	var resultSlice []*Sbom
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice sboms")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on sboms")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for sboms")
+	}
+
+	if len(sbomAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.Sboms = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &sbomR{}
+			}
+			foreign.R.Project = object
+		}
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if queries.Equal(local.ID, foreign.ProjectID) {
+				local.R.Sboms = append(local.R.Sboms, foreign)
+				if foreign.R == nil {
+					foreign.R = &sbomR{}
+				}
+				foreign.R.Project = local
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// LoadScanJobs allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (projectL) LoadScanJobs(ctx context.Context, e boil.ContextExecutor, singular bool, maybeProject interface{}, mods queries.Applicator) error {
+	var slice []*Project
+	var object *Project
+
+	if singular {
+		var ok bool
+		object, ok = maybeProject.(*Project)
+		if !ok {
+			object = new(Project)
+			ok = queries.SetFromEmbeddedStruct(&object, &maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", object, maybeProject))
+			}
+		}
+	} else {
+		s, ok := maybeProject.(*[]*Project)
+		if ok {
+			slice = *s
+		} else {
+			ok = queries.SetFromEmbeddedStruct(&slice, maybeProject)
+			if !ok {
+				return errors.New(fmt.Sprintf("failed to set %T from embedded struct %T", slice, maybeProject))
+			}
+		}
+	}
+
+	args := make(map[interface{}]struct{})
+	if singular {
+		if object.R == nil {
+			object.R = &projectR{}
+		}
+		args[object.ID] = struct{}{}
+	} else {
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &projectR{}
+			}
+			args[obj.ID] = struct{}{}
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	argsSlice := make([]interface{}, len(args))
+	i := 0
+	for arg := range args {
+		argsSlice[i] = arg
+		i++
+	}
+
+	query := NewQuery(
+		qm.From(`scan_jobs`),
+		qm.WhereIn(`scan_jobs.project_id in ?`, argsSlice...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load scan_jobs")
+	}
+
+	var resultSlice []*ScanJob
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice scan_jobs")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on scan_jobs")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for scan_jobs")
+	}
+
+	if len(scanJobAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.ScanJobs = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &scanJobR{}
+			}
+			foreign.R.Project = object
+		}
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if queries.Equal(local.ID, foreign.ProjectID) {
+				local.R.ScanJobs = append(local.R.ScanJobs, foreign)
+				if foreign.R == nil {
+					foreign.R = &scanJobR{}
+				}
+				foreign.R.Project = local
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// SetCreatedByUser of the project to the related item.
+// Sets o.R.CreatedByUser to related.
+// Adds o to related.R.CreatedByProjects.
+func (o *Project) SetCreatedByUser(ctx context.Context, exec boil.ContextExecutor, insert bool, related *User) error {
+	var err error
+	if insert {
+		if err = related.Insert(ctx, exec, boil.Infer()); err != nil {
+			return errors.Wrap(err, "failed to insert into foreign table")
+		}
+	}
+
+	updateQuery := fmt.Sprintf(
+		"UPDATE \"projects\" SET %s WHERE %s",
+		strmangle.SetParamNames("\"", "\"", 1, []string{"created_by"}),
+		strmangle.WhereClause("\"", "\"", 2, projectPrimaryKeyColumns),
+	)
+	values := []interface{}{related.ID, o.ID}
+
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, updateQuery)
+		fmt.Fprintln(writer, values)
+	}
+	if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	queries.Assign(&o.CreatedBy, related.ID)
+	if o.R == nil {
+		o.R = &projectR{
+			CreatedByUser: related,
+		}
+	} else {
+		o.R.CreatedByUser = related
+	}
+
+	if related.R == nil {
+		related.R = &userR{
+			CreatedByProjects: ProjectSlice{o},
+		}
+	} else {
+		related.R.CreatedByProjects = append(related.R.CreatedByProjects, o)
+	}
+
+	return nil
+}
+
+// RemoveCreatedByUser relationship.
+// Sets o.R.CreatedByUser to nil.
+// Removes o from all passed in related items' relationships struct.
+func (o *Project) RemoveCreatedByUser(ctx context.Context, exec boil.ContextExecutor, related *User) error {
+	var err error
+
+	queries.SetScanner(&o.CreatedBy, nil)
+	if _, err = o.Update(ctx, exec, boil.Whitelist("created_by")); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	if o.R != nil {
+		o.R.CreatedByUser = nil
+	}
+	if related == nil || related.R == nil {
+		return nil
+	}
+
+	for i, ri := range related.R.CreatedByProjects {
+		if queries.Equal(o.CreatedBy, ri.CreatedBy) {
+			continue
+		}
+
+		ln := len(related.R.CreatedByProjects)
+		if ln > 1 && i < ln-1 {
+			related.R.CreatedByProjects[i] = related.R.CreatedByProjects[ln-1]
+		}
+		related.R.CreatedByProjects = related.R.CreatedByProjects[:ln-1]
+		break
+	}
+	return nil
+}
+
+// SetOrganization of the project to the related item.
+// Sets o.R.Organization to related.
+// Adds o to related.R.Projects.
+func (o *Project) SetOrganization(ctx context.Context, exec boil.ContextExecutor, insert bool, related *Organization) error {
+	var err error
+	if insert {
+		if err = related.Insert(ctx, exec, boil.Infer()); err != nil {
+			return errors.Wrap(err, "failed to insert into foreign table")
+		}
+	}
+
+	updateQuery := fmt.Sprintf(
+		"UPDATE \"projects\" SET %s WHERE %s",
+		strmangle.SetParamNames("\"", "\"", 1, []string{"organization_id"}),
+		strmangle.WhereClause("\"", "\"", 2, projectPrimaryKeyColumns),
+	)
+	values := []interface{}{related.ID, o.ID}
+
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, updateQuery)
+		fmt.Fprintln(writer, values)
+	}
+	if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	queries.Assign(&o.OrganizationID, related.ID)
+	if o.R == nil {
+		o.R = &projectR{
+			Organization: related,
+		}
+	} else {
+		o.R.Organization = related
+	}
+
+	if related.R == nil {
+		related.R = &organizationR{
+			Projects: ProjectSlice{o},
+		}
+	} else {
+		related.R.Projects = append(related.R.Projects, o)
+	}
+
+	return nil
+}
+
+// RemoveOrganization relationship.
+// Sets o.R.Organization to nil.
+// Removes o from all passed in related items' relationships struct.
+func (o *Project) RemoveOrganization(ctx context.Context, exec boil.ContextExecutor, related *Organization) error {
+	var err error
+
+	queries.SetScanner(&o.OrganizationID, nil)
+	if _, err = o.Update(ctx, exec, boil.Whitelist("organization_id")); err != nil {
+		return errors.Wrap(err, "failed to update local table")
+	}
+
+	if o.R != nil {
+		o.R.Organization = nil
+	}
+	if related == nil || related.R == nil {
+		return nil
+	}
+
+	for i, ri := range related.R.Projects {
+		if queries.Equal(o.OrganizationID, ri.OrganizationID) {
+			continue
+		}
+
+		ln := len(related.R.Projects)
+		if ln > 1 && i < ln-1 {
+			related.R.Projects[i] = related.R.Projects[ln-1]
+		}
+		related.R.Projects = related.R.Projects[:ln-1]
+		break
+	}
+	return nil
+}
+
 // SetOwner of the project to the related item.
 // Sets o.R.Owner to related.
 // Adds o to related.R.OwnerProjects.
@@ -845,6 +1662,260 @@ func (o *Project) RemoveOwner(ctx context.Context, exec boil.ContextExecutor, re
 	return nil
 }
 
+// AddSboms adds the given related objects to the existing relationships
+// of the project, optionally inserting them as new records.
+// Appends related to o.R.Sboms.
+// Sets related.R.Project appropriately.
+func (o *Project) AddSboms(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*Sbom) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			queries.Assign(&rel.ProjectID, o.ID)
+			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"sboms\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"project_id"}),
+				strmangle.WhereClause("\"", "\"", 2, sbomPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.IsDebug(ctx) {
+				writer := boil.DebugWriterFrom(ctx)
+				fmt.Fprintln(writer, updateQuery)
+				fmt.Fprintln(writer, values)
+			}
+			if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			queries.Assign(&rel.ProjectID, o.ID)
+		}
+	}
+
+	if o.R == nil {
+		o.R = &projectR{
+			Sboms: related,
+		}
+	} else {
+		o.R.Sboms = append(o.R.Sboms, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &sbomR{
+				Project: o,
+			}
+		} else {
+			rel.R.Project = o
+		}
+	}
+	return nil
+}
+
+// SetSboms removes all previously related items of the
+// project replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Project's Sboms accordingly.
+// Replaces o.R.Sboms with related.
+// Sets related.R.Project's Sboms accordingly.
+func (o *Project) SetSboms(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*Sbom) error {
+	query := "update \"sboms\" set \"project_id\" = null where \"project_id\" = $1"
+	values := []interface{}{o.ID}
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, query)
+		fmt.Fprintln(writer, values)
+	}
+	_, err := exec.ExecContext(ctx, query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+
+	if o.R != nil {
+		for _, rel := range o.R.Sboms {
+			queries.SetScanner(&rel.ProjectID, nil)
+			if rel.R == nil {
+				continue
+			}
+
+			rel.R.Project = nil
+		}
+		o.R.Sboms = nil
+	}
+
+	return o.AddSboms(ctx, exec, insert, related...)
+}
+
+// RemoveSboms relationships from objects passed in.
+// Removes related items from R.Sboms (uses pointer comparison, removal does not keep order)
+// Sets related.R.Project.
+func (o *Project) RemoveSboms(ctx context.Context, exec boil.ContextExecutor, related ...*Sbom) error {
+	if len(related) == 0 {
+		return nil
+	}
+
+	var err error
+	for _, rel := range related {
+		queries.SetScanner(&rel.ProjectID, nil)
+		if rel.R != nil {
+			rel.R.Project = nil
+		}
+		if _, err = rel.Update(ctx, exec, boil.Whitelist("project_id")); err != nil {
+			return err
+		}
+	}
+	if o.R == nil {
+		return nil
+	}
+
+	for _, rel := range related {
+		for i, ri := range o.R.Sboms {
+			if rel != ri {
+				continue
+			}
+
+			ln := len(o.R.Sboms)
+			if ln > 1 && i < ln-1 {
+				o.R.Sboms[i] = o.R.Sboms[ln-1]
+			}
+			o.R.Sboms = o.R.Sboms[:ln-1]
+			break
+		}
+	}
+
+	return nil
+}
+
+// AddScanJobs adds the given related objects to the existing relationships
+// of the project, optionally inserting them as new records.
+// Appends related to o.R.ScanJobs.
+// Sets related.R.Project appropriately.
+func (o *Project) AddScanJobs(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*ScanJob) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			queries.Assign(&rel.ProjectID, o.ID)
+			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"scan_jobs\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"project_id"}),
+				strmangle.WhereClause("\"", "\"", 2, scanJobPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.IsDebug(ctx) {
+				writer := boil.DebugWriterFrom(ctx)
+				fmt.Fprintln(writer, updateQuery)
+				fmt.Fprintln(writer, values)
+			}
+			if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			queries.Assign(&rel.ProjectID, o.ID)
+		}
+	}
+
+	if o.R == nil {
+		o.R = &projectR{
+			ScanJobs: related,
+		}
+	} else {
+		o.R.ScanJobs = append(o.R.ScanJobs, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &scanJobR{
+				Project: o,
+			}
+		} else {
+			rel.R.Project = o
+		}
+	}
+	return nil
+}
+
+// SetScanJobs removes all previously related items of the
+// project replacing them completely with the passed
+// in related items, optionally inserting them as new records.
+// Sets o.R.Project's ScanJobs accordingly.
+// Replaces o.R.ScanJobs with related.
+// Sets related.R.Project's ScanJobs accordingly.
+func (o *Project) SetScanJobs(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*ScanJob) error {
+	query := "update \"scan_jobs\" set \"project_id\" = null where \"project_id\" = $1"
+	values := []interface{}{o.ID}
+	if boil.IsDebug(ctx) {
+		writer := boil.DebugWriterFrom(ctx)
+		fmt.Fprintln(writer, query)
+		fmt.Fprintln(writer, values)
+	}
+	_, err := exec.ExecContext(ctx, query, values...)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove relationships before set")
+	}
+
+	if o.R != nil {
+		for _, rel := range o.R.ScanJobs {
+			queries.SetScanner(&rel.ProjectID, nil)
+			if rel.R == nil {
+				continue
+			}
+
+			rel.R.Project = nil
+		}
+		o.R.ScanJobs = nil
+	}
+
+	return o.AddScanJobs(ctx, exec, insert, related...)
+}
+
+// RemoveScanJobs relationships from objects passed in.
+// Removes related items from R.ScanJobs (uses pointer comparison, removal does not keep order)
+// Sets related.R.Project.
+func (o *Project) RemoveScanJobs(ctx context.Context, exec boil.ContextExecutor, related ...*ScanJob) error {
+	if len(related) == 0 {
+		return nil
+	}
+
+	var err error
+	for _, rel := range related {
+		queries.SetScanner(&rel.ProjectID, nil)
+		if rel.R != nil {
+			rel.R.Project = nil
+		}
+		if _, err = rel.Update(ctx, exec, boil.Whitelist("project_id")); err != nil {
+			return err
+		}
+	}
+	if o.R == nil {
+		return nil
+	}
+
+	for _, rel := range related {
+		for i, ri := range o.R.ScanJobs {
+			if rel != ri {
+				continue
+			}
+
+			ln := len(o.R.ScanJobs)
+			if ln > 1 && i < ln-1 {
+				o.R.ScanJobs[i] = o.R.ScanJobs[ln-1]
+			}
+			o.R.ScanJobs = o.R.ScanJobs[:ln-1]
+			break
+		}
+	}
+
+	return nil
+}
+
 // Projects retrieves all the records using an executor.
 func Projects(mods ...qm.QueryMod) projectQuery {
 	mods = append(mods, qm.From("\"projects\""))
@@ -899,6 +1970,9 @@ func (o *Project) Insert(ctx context.Context, exec boil.ContextExecutor, columns
 
 		if queries.MustTime(o.CreatedAt).IsZero() {
 			queries.SetScanner(&o.CreatedAt, currTime)
+		}
+		if queries.MustTime(o.UpdatedAt).IsZero() {
+			queries.SetScanner(&o.UpdatedAt, currTime)
 		}
 	}
 
@@ -976,6 +2050,12 @@ func (o *Project) Insert(ctx context.Context, exec boil.ContextExecutor, columns
 // See boil.Columns.UpdateColumnSet documentation to understand column list inference for updates.
 // Update does not automatically update the record in case of default values. Use .Reload() to refresh the records.
 func (o *Project) Update(ctx context.Context, exec boil.ContextExecutor, columns boil.Columns) (int64, error) {
+	if !boil.TimestampsAreSkipped(ctx) {
+		currTime := time.Now().In(boil.GetLocation())
+
+		queries.SetScanner(&o.UpdatedAt, currTime)
+	}
+
 	var err error
 	if err = o.doBeforeUpdateHooks(ctx, exec); err != nil {
 		return 0, err
@@ -1112,6 +2192,7 @@ func (o *Project) Upsert(ctx context.Context, exec boil.ContextExecutor, updateO
 		if queries.MustTime(o.CreatedAt).IsZero() {
 			queries.SetScanner(&o.CreatedAt, currTime)
 		}
+		queries.SetScanner(&o.UpdatedAt, currTime)
 	}
 
 	if err := o.doBeforeUpsertHooks(ctx, exec); err != nil {
