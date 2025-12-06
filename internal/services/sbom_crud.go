@@ -53,6 +53,7 @@ func UpsertSBOM(ctx context.Context, db *sql.DB, projectID int, projectName stri
 		existing.Sbom = sbomJSON
 		existing.ObjectURL = null.StringFrom(objectURL)
 		existing.Summary = null.JSONFrom(summaryBytes)
+		existing.Source = source
 		_, err := existing.Update(ctx, db, boil.Infer())
 		return existing.ID, "update", err
 	}

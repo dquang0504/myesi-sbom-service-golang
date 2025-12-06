@@ -3,12 +3,12 @@ package v1
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"fmt"
 	"io"
 	"myesi-sbom-service-golang/internal/db"
 	"myesi-sbom-service-golang/internal/services"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 
 	fiber "github.com/gofiber/fiber/v2"
@@ -82,7 +82,7 @@ func uploadSBOM(c *fiber.Ctx) error {
 	// ---------------------------------------------------------
 	var allowed bool
 	var msg string
-	var periodEnd time.Time
+	var periodEnd sql.NullTime
 
 	row := db.Conn.QueryRowContext(
 		c.Context(),
@@ -163,10 +163,10 @@ func uploadSBOM(c *fiber.Ctx) error {
 	// ---------------------------------------------------------
 	// 8. Insert/update SBOM in database
 	// ---------------------------------------------------------
-	id, operation, err := services.UpsertSBOM(
+	id, _, err := services.UpsertSBOM(
 		context.Background(), db.Conn,
 		projectID, projectName, manifestName,
-		sbomResult.Data, "upload", url,
+		sbomResult.Data, "manual", url,
 	)
 
 	if err != nil {
@@ -178,7 +178,8 @@ func uploadSBOM(c *fiber.Ctx) error {
 	// 9. Extract components + publish event
 	// ---------------------------------------------------------
 	components := services.ExtractComponents(sbomResult.Data)
-	services.PublishSBOMEvent(id, projectName, components, operation)
+	services.PublishSBOMEvent(id, projectName, projectID, org, components, "manual")
+	services.PublishManualSBOMSummary(org, projectName, len(components), 0, "completed")
 
 	return c.JSON(fiber.Map{
 		"id":           id,
@@ -244,22 +245,66 @@ type GitHubSBOMRequest struct {
 // @Accept json
 // @Produce json
 // @Param project_name query string false "Project Name"
-// @Param limit query int false "Limit"
-// @Success 200 {array} map[string]interface{}
+// @Param source query string false "Source (manual|auto-code-scan)"
+// @Param q query string false "Search (project or manifest)"
+// @Param page query int false "Page (default 1)"
+// @Param page_size query int false "Page size (max 100, default 10)"
+// @Success 200 {object} map[string]interface{}
 // @Failure 500 {object} map[string]interface{}
 // @Router /recent [get]
 func recentSBOMs(c *fiber.Ctx) error {
 	project := c.Query("project_name")
-	limit := c.QueryInt("limit", 20)
+	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
+	search := strings.TrimSpace(c.Query("q"))
+	page := c.QueryInt("page", 1)
+	if page < 1 {
+		page = 1
+	}
+	pageSize := c.QueryInt("page_size", 10)
+	if pageSize <= 0 || pageSize > 100 {
+		pageSize = 10
+	}
+	offset := (page - 1) * pageSize
 
-	query := `
-		SELECT id, project_name, manifest_name, object_url, sbom, created_at, source
+	var (
+		whereParts []string
+		args       []interface{}
+	)
+	whereParts = append(whereParts, "1=1")
+
+	if project != "" {
+		args = append(args, project)
+		whereParts = append(whereParts, fmt.Sprintf("project_name = $%d", len(args)))
+	}
+	if source != "" && source != "all" {
+		args = append(args, source)
+		whereParts = append(whereParts, fmt.Sprintf("LOWER(source) = $%d", len(args)))
+	}
+	if search != "" {
+		args = append(args, "%"+search+"%")
+		whereParts = append(whereParts, fmt.Sprintf("(manifest_name ILIKE $%d OR project_name ILIKE $%d)", len(args), len(args)))
+	}
+
+	whereClause := strings.Join(whereParts, " AND ")
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM sboms WHERE %s`, whereClause)
+	var total int
+	if err := db.Conn.QueryRowContext(c.Context(), countQuery, args...).Scan(&total); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	argsWithPaging := append([]interface{}{}, args...)
+	argsWithPaging = append(argsWithPaging, pageSize, offset)
+	listQuery := fmt.Sprintf(`
+		SELECT id, project_name, manifest_name, object_url, created_at, source,
+		       COALESCE(jsonb_array_length(sbom->'components'), 0) AS findings
 		FROM sboms
-		WHERE $1 = '' OR project_name = $1
+		WHERE %s
 		ORDER BY created_at DESC
-		LIMIT ` + strconv.Itoa(limit)
+		LIMIT $%d OFFSET $%d
+	`, whereClause, len(args)+1, len(args)+2)
 
-	rows, err := db.Conn.QueryContext(c.Context(), query, project)
+	rows, err := db.Conn.QueryContext(c.Context(), listQuery, argsWithPaging...)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -278,21 +323,13 @@ func recentSBOMs(c *fiber.Ctx) error {
 	var list []SBOMItem
 	for rows.Next() {
 		var (
-			id, projectName, source string
-			manifestName, objectURL sql.NullString
-			createdAt               string
-			sbomJSON                []byte
+			id, projectName, sourceVal string
+			manifestName, objectURL    sql.NullString
+			createdAt                  time.Time
+			findings                   int
 		)
-		if err := rows.Scan(&id, &projectName, &manifestName, &objectURL, &sbomJSON, &createdAt, &source); err != nil {
+		if err := rows.Scan(&id, &projectName, &manifestName, &objectURL, &createdAt, &sourceVal, &findings); err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-		}
-
-		findings := 0
-		var sbomData map[string]interface{}
-		if err := json.Unmarshal(sbomJSON, &sbomData); err == nil {
-			if comps, ok := sbomData["components"].([]interface{}); ok {
-				findings = len(comps)
-			}
 		}
 
 		list = append(list, SBOMItem{
@@ -300,13 +337,18 @@ func recentSBOMs(c *fiber.Ctx) error {
 			ProjectName:  projectName,
 			ManifestName: manifestName.String, // nếu null -> ""
 			ObjectURL:    objectURL.String,
-			CreatedAt:    createdAt,
-			Source:       source,
+			CreatedAt:    createdAt.Format(time.RFC3339),
+			Source:       sourceVal,
 			Findings:     findings,
 		})
 	}
 
-	return c.JSON(list)
+	return c.JSON(fiber.Map{
+		"data":      list,
+		"page":      page,
+		"page_size": pageSize,
+		"total":     total,
+	})
 }
 
 func sbomAnalytics(c *fiber.Ctx) error {
