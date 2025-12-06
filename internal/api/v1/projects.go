@@ -7,6 +7,7 @@ import (
 	"myesi-sbom-service-golang/models"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aarondl/null/v8"
@@ -16,6 +17,21 @@ import (
 	"github.com/ericlagergren/decimal"
 	"github.com/gofiber/fiber/v2"
 )
+
+func nullableString(ns null.String) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
+}
+
+func nullableInt(ni null.Int) *int {
+	if ni.Valid {
+		v := int(ni.Int)
+		return &v
+	}
+	return nil
+}
 
 // RegisterProjectRoutes mounts CRUD routes for projects table.
 func RegisterProjectRoutes(r fiber.Router) {
@@ -30,25 +46,129 @@ func RegisterProjectRoutes(r fiber.Router) {
 
 // List all projects
 func project_getAll(c *fiber.Ctx) error {
-	limit, _ := strconv.Atoi(c.Query("limit", "100"))
-	offset, _ := strconv.Atoi(c.Query("offset", "0"))
-	name := c.Query("name")
+	page, _ := strconv.Atoi(c.Query("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.Query("page_size", "12"))
+	if pageSize <= 0 || pageSize > 50 {
+		pageSize = 12
+	}
+	offset := (page - 1) * pageSize
 
-	q := []qm.QueryMod{
-		qm.OrderBy("created_at DESC"),
-		qm.Limit(limit),
-		qm.Offset(offset),
+	search := strings.TrimSpace(c.Query("q"))
+	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
+	language := strings.TrimSpace(c.Query("language"))
+	findings := strings.ToLower(strings.TrimSpace(c.Query("findings")))
+
+	baseMods := []qm.QueryMod{}
+
+	if search != "" {
+		baseMods = append(baseMods, qm.Where("name ILIKE ?", "%"+search+"%"))
 	}
 
-	if name != "" {
-		q = append(q, qm.Where("name ILIKE ?", "%"+name+"%"))
+	if source != "" && source != "all" {
+		baseMods = append(baseMods, qm.Where("LOWER(source_type) = ?", source))
 	}
 
-	list, err := models.Projects(q...).All(c.Context(), db.Conn)
+	if language != "" && language != "all" {
+		baseMods = append(baseMods, qm.Where("github_language::text ILIKE ?", "%"+language+"%"))
+	}
+	if findings == "with" {
+		baseMods = append(baseMods, qm.Where("COALESCE(total_vulnerabilities,0) > 0"))
+	} else if findings == "without" {
+		baseMods = append(baseMods, qm.Where("COALESCE(total_vulnerabilities,0) = 0"))
+	}
+
+	total, err := models.Projects(baseMods...).Count(c.Context(), db.Conn)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(list)
+
+	listMods := append([]qm.QueryMod{
+		qm.OrderBy("created_at DESC"),
+		qm.Limit(pageSize),
+		qm.Offset(offset),
+	}, baseMods...)
+
+	list, err := models.Projects(listMods...).All(c.Context(), db.Conn)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+
+	type ProjectDTO struct {
+		ID                   int64      `json:"id"`
+		Name                 string     `json:"name"`
+		Description          *string    `json:"description,omitempty"`
+		SourceType           *string    `json:"source_type,omitempty"`
+		RepoURL              *string    `json:"repo_url,omitempty"`
+		GithubFullName       *string    `json:"github_full_name,omitempty"`
+		GithubDefaultBranch  *string    `json:"github_default_branch,omitempty"`
+		GithubVisibility     *string    `json:"github_visibility,omitempty"`
+		GithubLastSync       *time.Time `json:"github_last_sync,omitempty"`
+		LastSbomUpload       *time.Time `json:"last_sbom_upload,omitempty"`
+		LastVulnScan         *time.Time `json:"last_vuln_scan,omitempty"`
+		AvgRiskScore         *float64   `json:"avg_risk_score,omitempty"`
+		TotalVulnerabilities *int       `json:"total_vulnerabilities,omitempty"`
+		OrganizationID       *int       `json:"organization_id,omitempty"`
+		Languages            []string   `json:"languages,omitempty"`
+		PrimaryLanguage      *string    `json:"primary_language,omitempty"`
+		CreatedAt            *time.Time `json:"created_at,omitempty"`
+	}
+
+	resp := make([]ProjectDTO, 0, len(list))
+	for _, p := range list {
+		var langs []string
+		if p.GithubLanguage.Valid {
+			_ = json.Unmarshal(p.GithubLanguage.JSON, &langs)
+		}
+
+		var primary *string
+		if len(langs) > 0 {
+			primary = &langs[0]
+		}
+
+		dto := ProjectDTO{
+			ID:                   int64(p.ID),
+			Name:                 p.Name,
+			Description:          nullableString(p.Description),
+			SourceType:           nullableString(p.SourceType),
+			RepoURL:              nullableString(p.RepoURL),
+			GithubFullName:       nullableString(p.GithubFullName),
+			GithubDefaultBranch:  nullableString(p.GithubDefaultBranch),
+			GithubVisibility:     nullableString(p.GithubVisibility),
+			Languages:            langs,
+			PrimaryLanguage:      primary,
+			TotalVulnerabilities: nullableInt(p.TotalVulnerabilities),
+			OrganizationID:       nullableInt(p.OrganizationID),
+		}
+
+		if p.GithubLastSync.Valid {
+			dto.GithubLastSync = &p.GithubLastSync.Time
+		}
+		if p.LastSbomUpload.Valid {
+			dto.LastSbomUpload = &p.LastSbomUpload.Time
+		}
+		if p.LastVulnScan.Valid {
+			dto.LastVulnScan = &p.LastVulnScan.Time
+		}
+		if p.AvgRiskScore.Big != nil {
+			f, _ := p.AvgRiskScore.Big.Float64()
+			dto.AvgRiskScore = &f
+		}
+		if p.CreatedAt.Valid {
+			dto.CreatedAt = &p.CreatedAt.Time
+		}
+
+		resp = append(resp, dto)
+	}
+
+	return c.JSON(fiber.Map{
+		"data":      resp,
+		"page":      page,
+		"page_size": pageSize,
+		"total":     total,
+	})
 }
 
 // Get a single project
