@@ -19,21 +19,27 @@ const (
 
 // SBOMEvent struct is the payload which gets sent to Vulnerability Service
 type SBOMEvent struct {
-	SBOMID     string              `json:"sbom_id"`
-	Project    string              `json:"project_name"`
-	Components []map[string]string `json:"components"`
+	SBOMID         string              `json:"sbom_id"`
+	Project        string              `json:"project_name"`
+	ProjectID      int                 `json:"project_id,omitempty"`
+	OrganizationID int                 `json:"organization_id,omitempty"`
+	Source         string              `json:"source,omitempty"`
+	Components     []map[string]string `json:"components"`
 }
 
 // PublishSBOMEvent publishes the event onto Kafka after SBOM creation
-func PublishSBOMEvent(sbomID string, project string, comps []map[string]string, operation string) {
+func PublishSBOMEvent(sbomID string, project string, projectID int, orgID int, comps []map[string]string, source string) {
 	//open telemetry initialization: used for message tracing
 	ctx, span := otel.Tracer("sbom-service").Start(context.Background(), "PublishSBOMEvent")
 	defer span.End()
 
 	event := SBOMEvent{
-		SBOMID:     sbomID,
-		Project:    project,
-		Components: comps,
+		SBOMID:         sbomID,
+		Project:        project,
+		ProjectID:      projectID,
+		OrganizationID: orgID,
+		Source:         source,
+		Components:     comps,
 	}
 	data, err := json.Marshal(event)
 	if err != nil {

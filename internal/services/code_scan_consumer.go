@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -93,7 +94,7 @@ func handleCodeScanDone(evt CodeScanEvent) {
 	// -----------------------------------------------------
 	var allowed bool
 	var msg string
-	var periodEnd time.Time
+	var periodEnd sql.NullTime
 	row := db.Conn.QueryRowContext(
 		ctx,
 		"SELECT allowed, message, next_reset FROM check_and_consume_usage($1,$2,$3)",
@@ -160,7 +161,7 @@ func handleCodeScanDone(evt CodeScanEvent) {
 
 		url, _ := UploadSBOMJSON(ctx, db.Conn, projectID, project, manifestName, sbomData, []byte(`{}`))
 
-		id, _, err := UpsertSBOM(ctx, db.Conn, projectID, project, manifestName, sbomData, "auto-fallback", url)
+		id, _, err := UpsertSBOM(ctx, db.Conn, projectID, project, manifestName, sbomData, "auto-code-scan", url)
 		if err != nil {
 			log.Printf("[SBOM][ERR] fallback upsert failed: %v", err)
 			revertUsage()
@@ -185,11 +186,14 @@ func handleCodeScanDone(evt CodeScanEvent) {
 	defer kafkaWriter.Close()
 
 	event := map[string]interface{}{
-		"type":         "sbom.batch_created",
-		"project":      project,
-		"project_id":   projectID,
-		"timestamp":    time.Now().UTC(),
-		"sbom_records": createdSBOMs,
+		"type":                        "sbom.batch_created",
+		"project":                     project,
+		"project_id":                  projectID,
+		"organization_id":             orgID,
+		"source":                      "project_scan",
+		"project_scan_quota_consumed": true,
+		"timestamp":                   time.Now().UTC(),
+		"sbom_records":                createdSBOMs,
 	}
 
 	data, _ := json.Marshal(event)
@@ -203,6 +207,7 @@ func handleCodeScanDone(evt CodeScanEvent) {
 	}
 
 	log.Printf("[KAFKA] Published batch event for %d SBOM(s) in project %s", len(createdSBOMs), project)
+
 }
 
 // Helper: publish warning/limit event
