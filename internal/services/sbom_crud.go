@@ -79,8 +79,15 @@ func GetSBOM(ctx context.Context, db *sql.DB, id string) (*models.Sbom, error) {
 	return models.FindSbom(ctx, db, id)
 }
 
-func ListSBOM(ctx context.Context, db *sql.DB, project string, limit int) ([]*models.Sbom, error) {
-	queryMods := []qm.QueryMod{qm.OrderBy("created_at desc"), qm.Limit(limit)}
+func ListSBOM(ctx context.Context, db *sql.DB, project string, limit int, orgID int) ([]*models.Sbom, error) {
+	queryMods := []qm.QueryMod{
+		qm.OrderBy("created_at desc"),
+		qm.Limit(limit),
+		qm.Where(
+			"EXISTS (SELECT 1 FROM projects p WHERE p.organization_id = ? AND (p.id = sboms.project_id OR p.name = sboms.project_name))",
+			orgID,
+		),
+	}
 	if project != "" {
 		queryMods = append(queryMods, qm.Where("project_name = ?", project))
 	}

@@ -45,6 +45,7 @@ type Project struct {
 	LastSyncError        null.String       `boil:"last_sync_error" json:"last_sync_error,omitempty" toml:"last_sync_error" yaml:"last_sync_error,omitempty"`
 	ImportStatus         null.String       `boil:"import_status" json:"import_status,omitempty" toml:"import_status" yaml:"import_status,omitempty"`
 	ScanStatus           null.String       `boil:"scan_status" json:"scan_status,omitempty" toml:"scan_status" yaml:"scan_status,omitempty"`
+	IsArchived           null.Bool         `boil:"is_archived" json:"is_archived,omitempty" toml:"is_archived" yaml:"is_archived,omitempty"`
 	LastSbomUpload       null.Time         `boil:"last_sbom_upload" json:"last_sbom_upload,omitempty" toml:"last_sbom_upload" yaml:"last_sbom_upload,omitempty"`
 	LastVulnScan         null.Time         `boil:"last_vuln_scan" json:"last_vuln_scan,omitempty" toml:"last_vuln_scan" yaml:"last_vuln_scan,omitempty"`
 	AvgRiskScore         types.NullDecimal `boil:"avg_risk_score" json:"avg_risk_score,omitempty" toml:"avg_risk_score" yaml:"avg_risk_score,omitempty"`
@@ -77,6 +78,7 @@ var ProjectColumns = struct {
 	LastSyncError        string
 	ImportStatus         string
 	ScanStatus           string
+	IsArchived           string
 	LastSbomUpload       string
 	LastVulnScan         string
 	AvgRiskScore         string
@@ -104,6 +106,7 @@ var ProjectColumns = struct {
 	LastSyncError:        "last_sync_error",
 	ImportStatus:         "import_status",
 	ScanStatus:           "scan_status",
+	IsArchived:           "is_archived",
 	LastSbomUpload:       "last_sbom_upload",
 	LastVulnScan:         "last_vuln_scan",
 	AvgRiskScore:         "avg_risk_score",
@@ -133,6 +136,7 @@ var ProjectTableColumns = struct {
 	LastSyncError        string
 	ImportStatus         string
 	ScanStatus           string
+	IsArchived           string
 	LastSbomUpload       string
 	LastVulnScan         string
 	AvgRiskScore         string
@@ -160,6 +164,7 @@ var ProjectTableColumns = struct {
 	LastSyncError:        "projects.last_sync_error",
 	ImportStatus:         "projects.import_status",
 	ScanStatus:           "projects.scan_status",
+	IsArchived:           "projects.is_archived",
 	LastSbomUpload:       "projects.last_sbom_upload",
 	LastVulnScan:         "projects.last_vuln_scan",
 	AvgRiskScore:         "projects.avg_risk_score",
@@ -303,6 +308,7 @@ var ProjectWhere = struct {
 	LastSyncError        whereHelpernull_String
 	ImportStatus         whereHelpernull_String
 	ScanStatus           whereHelpernull_String
+	IsArchived           whereHelpernull_Bool
 	LastSbomUpload       whereHelpernull_Time
 	LastVulnScan         whereHelpernull_Time
 	AvgRiskScore         whereHelpertypes_NullDecimal
@@ -330,6 +336,7 @@ var ProjectWhere = struct {
 	LastSyncError:        whereHelpernull_String{field: "\"projects\".\"last_sync_error\""},
 	ImportStatus:         whereHelpernull_String{field: "\"projects\".\"import_status\""},
 	ScanStatus:           whereHelpernull_String{field: "\"projects\".\"scan_status\""},
+	IsArchived:           whereHelpernull_Bool{field: "\"projects\".\"is_archived\""},
 	LastSbomUpload:       whereHelpernull_Time{field: "\"projects\".\"last_sbom_upload\""},
 	LastVulnScan:         whereHelpernull_Time{field: "\"projects\".\"last_vuln_scan\""},
 	AvgRiskScore:         whereHelpertypes_NullDecimal{field: "\"projects\".\"avg_risk_score\""},
@@ -453,7 +460,7 @@ type projectL struct{}
 var (
 	projectAllColumns            = []string{"id", "name", "description", "owner_id", "organization_id", "created_by", "source_type", "repo_url", "github_repo_id", "github_full_name", "github_visibility", "github_default_branch", "github_language", "stargazers_count", "forks_count", "is_fork", "github_last_sync", "last_sync_error", "import_status", "scan_status", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at", "updated_at"}
 	projectColumnsWithoutDefault = []string{"name"}
-	projectColumnsWithDefault    = []string{"id", "description", "owner_id", "organization_id", "created_by", "source_type", "repo_url", "github_repo_id", "github_full_name", "github_visibility", "github_default_branch", "github_language", "stargazers_count", "forks_count", "is_fork", "github_last_sync", "last_sync_error", "import_status", "scan_status", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at", "updated_at"}
+	projectColumnsWithDefault    = []string{"id", "description", "owner_id", "organization_id", "created_by", "source_type", "repo_url", "github_repo_id", "github_full_name", "github_visibility", "github_default_branch", "github_language", "stargazers_count", "forks_count", "is_fork", "github_last_sync", "last_sync_error", "import_status", "scan_status", "is_archived", "last_sbom_upload", "last_vuln_scan", "avg_risk_score", "total_vulnerabilities", "created_at", "updated_at"}
 	projectPrimaryKeyColumns     = []string{"id"}
 	projectGeneratedColumns      = []string{}
 )

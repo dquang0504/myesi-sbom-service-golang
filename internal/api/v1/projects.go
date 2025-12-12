@@ -3,6 +3,7 @@ package v1
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"myesi-sbom-service-golang/internal/db"
 	"myesi-sbom-service-golang/models"
 	"sort"
@@ -40,12 +41,18 @@ func RegisterProjectRoutes(r fiber.Router) {
 	r.Post("/import/github", importGithubProjects)
 	r.Get("/top-languages", project_topLanguages)
 	r.Put("/:id", project_update)
+	r.Post("/:id/archive", project_archive)
 	r.Delete("/:id", project_delete)
 	r.Get("/:id", project_getOne)
 }
 
 // List all projects
 func project_getAll(c *fiber.Ctx) error {
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	if page < 1 {
 		page = 1
@@ -60,8 +67,11 @@ func project_getAll(c *fiber.Ctx) error {
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
 	language := strings.TrimSpace(c.Query("language"))
 	findings := strings.ToLower(strings.TrimSpace(c.Query("findings")))
+	status := strings.ToLower(strings.TrimSpace(c.Query("status", "active")))
 
-	baseMods := []qm.QueryMod{}
+	baseMods := []qm.QueryMod{
+		qm.Where("organization_id = ?", orgID),
+	}
 
 	if search != "" {
 		baseMods = append(baseMods, qm.Where("name ILIKE ?", "%"+search+"%"))
@@ -73,6 +83,14 @@ func project_getAll(c *fiber.Ctx) error {
 
 	if language != "" && language != "all" {
 		baseMods = append(baseMods, qm.Where("github_language::text ILIKE ?", "%"+language+"%"))
+	}
+	switch status {
+	case "archived":
+		baseMods = append(baseMods, qm.Where("is_archived = TRUE"))
+	case "all":
+		// no-op
+	default: // "active"
+		baseMods = append(baseMods, qm.Where("(is_archived IS NULL OR is_archived = FALSE)"))
 	}
 	if findings == "with" {
 		baseMods = append(baseMods, qm.Where("COALESCE(total_vulnerabilities,0) > 0"))
@@ -114,6 +132,7 @@ func project_getAll(c *fiber.Ctx) error {
 		Languages            []string   `json:"languages,omitempty"`
 		PrimaryLanguage      *string    `json:"primary_language,omitempty"`
 		CreatedAt            *time.Time `json:"created_at,omitempty"`
+		IsArchived           bool       `json:"is_archived"`
 	}
 
 	resp := make([]ProjectDTO, 0, len(list))
@@ -159,6 +178,7 @@ func project_getAll(c *fiber.Ctx) error {
 		if p.CreatedAt.Valid {
 			dto.CreatedAt = &p.CreatedAt.Time
 		}
+		dto.IsArchived = p.IsArchived.Valid && p.IsArchived.Bool
 
 		resp = append(resp, dto)
 	}
@@ -178,7 +198,14 @@ func project_getOne(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid project id")
 	}
 
-	project, err := models.FindProject(c.Context(), db.Conn, id)
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, err.Error())
+	}
+
+	project, err := models.Projects(
+		qm.Where("id = ? AND organization_id = ?", id, orgID),
+	).One(c.Context(), db.Conn)
 	if err == sql.ErrNoRows {
 		return fiber.NewError(fiber.StatusNotFound, "project not found")
 	} else if err != nil {
@@ -201,6 +228,15 @@ func project_create(c *fiber.Ctx) error {
 	}
 	if payload.Name == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "project name required")
+	}
+
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
+	if payload.OrganizationID != 0 && payload.OrganizationID != orgID {
+		return fiber.NewError(fiber.StatusForbidden, "organization mismatch")
 	}
 
 	p := &models.Project{
@@ -226,7 +262,15 @@ func project_update(c *fiber.Ctx) error {
 	if err != nil || id == 0 {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid id")
 	}
-	existing, err := models.FindProject(c.Context(), db.Conn, id)
+
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
+	existing, err := models.Projects(
+		qm.Where("id = ? AND organization_id = ?", id, orgID),
+	).One(c.Context(), db.Conn)
 	if err == sql.ErrNoRows {
 		return fiber.NewError(fiber.StatusNotFound, "project not found")
 	} else if err != nil {
@@ -275,7 +319,14 @@ func project_delete(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid id")
 	}
 
-	p, err := models.FindProject(c.Context(), db.Conn, id)
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
+	p, err := models.Projects(
+		qm.Where("id = ? AND organization_id = ?", id, orgID),
+	).One(c.Context(), db.Conn)
 	if err == sql.ErrNoRows {
 		return fiber.NewError(fiber.StatusNotFound, "not found")
 	} else if err != nil {
@@ -302,6 +353,11 @@ type RepoInput struct {
 }
 
 func importGithubProjects(c *fiber.Ctx) error {
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
 	var payload struct {
 		Repos []RepoInput `json:"repos"`
 	}
@@ -315,8 +371,13 @@ func importGithubProjects(c *fiber.Ctx) error {
 	var created []string
 
 	for _, repo := range payload.Repos {
+		if repo.OrganizationID != 0 && repo.OrganizationID != orgID {
+			return fiber.NewError(fiber.StatusForbidden, "organization mismatch")
+		}
+
 		exists, err := models.Projects(
 			models.ProjectWhere.GithubRepoID.EQ(null.Int64From(repo.ID)),
+			models.ProjectWhere.OrganizationID.EQ(null.IntFrom(orgID)),
 		).Exists(c.Context(), db.Conn)
 		if err != nil {
 			return fiber.NewError(fiber.StatusInternalServerError, err.Error())
@@ -336,7 +397,7 @@ func importGithubProjects(c *fiber.Ctx) error {
 			GithubDefaultBranch: null.StringFrom(repo.DefaultBranch),
 			GithubLanguage:      null.JSONFrom(langsJSON),
 			CreatedAt:           null.TimeFrom(time.Now()),
-			OrganizationID:      null.IntFrom(repo.OrganizationID),
+			OrganizationID:      null.IntFrom(orgID),
 		}
 		if repo.Description != nil {
 			p.Description = null.StringFromPtr(repo.Description)
@@ -359,11 +420,17 @@ func importGithubProjects(c *fiber.Ctx) error {
 }
 
 func project_topLanguages(c *fiber.Ctx) error {
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
 	rows, err := db.Conn.QueryContext(c.Context(), `
         SELECT github_language
         FROM projects
         WHERE github_language IS NOT NULL
-    `)
+          AND organization_id = $1
+    `, orgID)
 	if err != nil {
 		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
 	}
@@ -412,4 +479,47 @@ func project_topLanguages(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"data": list,
 	})
+}
+
+// Archive/unarchive a project
+func project_archive(c *fiber.Ctx) error {
+	id, err := c.ParamsInt("id")
+	if err != nil || id == 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid project id")
+	}
+
+	orgID, err := requireOrgID(c)
+	if err != nil {
+		return fiber.NewError(fiber.StatusForbidden, err.Error())
+	}
+
+	var payload struct {
+		Archived bool `json:"archived"`
+	}
+	if err := c.BodyParser(&payload); err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid payload")
+	}
+
+	updates := models.M{
+		"is_archived": payload.Archived,
+		"updated_at":  time.Now(),
+	}
+
+	rows, err := models.Projects(
+		models.ProjectWhere.ID.EQ(id),
+		models.ProjectWhere.OrganizationID.EQ(null.IntFrom(orgID)),
+	).UpdateAll(c.Context(), db.Conn, updates)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, err.Error())
+	}
+	if rows == 0 {
+		return fiber.NewError(fiber.StatusNotFound, "project not found")
+	}
+
+	action := "archived"
+	if !payload.Archived {
+		action = "restored"
+	}
+
+	return c.JSON(fiber.Map{"message": fmt.Sprintf("project %s", action)})
 }
