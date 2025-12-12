@@ -61,6 +61,7 @@ func handleCodeScanDone(evt CodeScanEvent) {
 	ctx := context.Background()
 	project := evt.Project
 	projectID := evt.ProjectID
+	codeFindingsCount := len(evt.Findings)
 
 	// -----------------------------------------------------
 	// 1) Load orgID
@@ -191,6 +192,7 @@ func handleCodeScanDone(evt CodeScanEvent) {
 		"project_id":                  projectID,
 		"organization_id":             orgID,
 		"source":                      "project_scan",
+		"code_findings_count":         codeFindingsCount,
 		"project_scan_quota_consumed": true,
 		"timestamp":                   time.Now().UTC(),
 		"sbom_records":                createdSBOMs,
