@@ -3,6 +3,7 @@ module myesi-sbom-service-golang
 go 1.25.1
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.4.1
 	github.com/aarondl/null/v8 v8.1.3
 	github.com/aarondl/randomize v0.0.2
 	github.com/aarondl/sqlboiler/v4 v4.19.5
@@ -16,6 +17,7 @@ require (
 	github.com/lib/pq v1.10.6
 	github.com/segmentio/kafka-go v0.4.49
 	github.com/spf13/viper v1.20.0
+	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/swag v1.16.6
 )
 

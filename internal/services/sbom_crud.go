@@ -35,7 +35,7 @@ func CreateSBOM(ctx context.Context, db *sql.DB, project string, sbomJSON []byte
 	return sbom.ID, "create", err
 }
 
-func UpsertSBOM(ctx context.Context, db *sql.DB, projectID int, projectName string, manifestName string, sbomJSON []byte, source, objectURL string) (string, string, error) {
+func UpsertSBOM(ctx context.Context, exec boil.ContextExecutor, projectID int, projectName string, manifestName string, sbomJSON []byte, source, objectURL string) (string, string, error) {
 	//Generate summary from sbomjson
 	summary, err := ParseSBOMSummary(sbomJSON)
 	if err != nil {
@@ -46,7 +46,7 @@ func UpsertSBOM(ctx context.Context, db *sql.DB, projectID int, projectName stri
 	//Check existing SBOM
 	existing, err := models.Sboms(
 		qm.Where("project_name=? AND manifest_name=?", projectName, manifestName),
-	).One(ctx, db)
+	).One(ctx, exec)
 
 	if err == nil && existing != nil {
 		existing.ProjectID = null.IntFrom(projectID)
@@ -54,7 +54,7 @@ func UpsertSBOM(ctx context.Context, db *sql.DB, projectID int, projectName stri
 		existing.ObjectURL = null.StringFrom(objectURL)
 		existing.Summary = null.JSONFrom(summaryBytes)
 		existing.Source = source
-		_, err := existing.Update(ctx, db, boil.Infer())
+		_, err := existing.Update(ctx, exec, boil.Infer())
 		return existing.ID, "update", err
 	}
 	//Insert if not found
@@ -71,7 +71,7 @@ func UpsertSBOM(ctx context.Context, db *sql.DB, projectID int, projectName stri
 		ObjectURL:    null.StringFrom(objectURL),
 	}
 
-	err = sbom.Insert(ctx, db, boil.Infer())
+	err = sbom.Insert(ctx, exec, boil.Infer())
 	return sbom.ID, "create", err
 }
 
