@@ -2,14 +2,11 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"log"
-	"myesi-sbom-service-golang/internal/config"
-	"time"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/aarondl/sqlboiler/v4/boil"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 // Kafka config
@@ -27,11 +24,15 @@ type SBOMEvent struct {
 	Components     []map[string]string `json:"components"`
 }
 
-// PublishSBOMEvent publishes the event onto Kafka after SBOM creation
-func PublishSBOMEvent(sbomID string, project string, projectID int, orgID int, comps []map[string]string, source string) {
-	//open telemetry initialization: used for message tracing
-	ctx, span := otel.Tracer("sbom-service").Start(context.Background(), "PublishSBOMEvent")
+// QueueSBOMEvent persists an event for async publishing via the outbox.
+func QueueSBOMEvent(ctx context.Context, exec boil.ContextExecutor, sbomID string, project string, projectID int, orgID int, comps []map[string]string, source string) error {
+	ctx, span := otel.Tracer("sbom-service").Start(ctx, "QueueSBOMEvent")
 	defer span.End()
+
+	headers := map[string]string{}
+	if propagator := otel.GetTextMapPropagator(); propagator != nil {
+		propagator.Inject(ctx, propagation.MapCarrier(headers))
+	}
 
 	event := SBOMEvent{
 		SBOMID:         sbomID,
@@ -41,70 +42,16 @@ func PublishSBOMEvent(sbomID string, project string, projectID int, orgID int, c
 		Source:         source,
 		Components:     comps,
 	}
-	data, err := json.Marshal(event)
+
+	err := EnqueueOutboxEvent(ctx, exec, OutboxMessage{
+		Topic:     KafkaTopic,
+		EventType: "sbom.created",
+		Key:       sbomID,
+		Payload:   event,
+		Headers:   headers,
+	})
 	if err != nil {
-		log.Println("Kafka: cannot marshal SBOM event: ", err)
-		return
+		log.Printf("[OUTBOX][ERR] queue sbom event failed: %v", err)
 	}
-
-	//Inject OTel trace context into Kafka headers
-	headers := make([]kafka.Header, 0)
-	propagator := otel.GetTextMapPropagator()
-	carrier := kafkaHeaderCarrier{&headers}
-	propagator.Inject(ctx, carrier)
-
-	writer := kafka.Writer{
-		Addr:         kafka.TCP(config.LoadConfig().KafkaBroker),
-		Topic:        KafkaTopic,
-		Balancer:     &kafka.LeastBytes{},
-		RequiredAcks: kafka.RequireAll,
-		Async:        false,
-	}
-	defer writer.Close()
-
-	msg := kafka.Message{
-		Key:     []byte(sbomID),
-		Value:   data,
-		Time:    time.Now(),
-		Headers: headers,
-	}
-
-	if err = writer.WriteMessages(ctx, msg); err != nil {
-		log.Println("Kafka: failed to write message: ", err)
-		return
-	}
-
-	span.SetAttributes(
-		attribute.String("kafka.topic", KafkaTopic),
-		attribute.String("sbom.id", sbomID),
-		attribute.String("sbom.project", project),
-	)
-
-	log.Printf("[Kafka] Published SBOM event for %s\n", sbomID)
-}
-
-// custom carrier to inject/extract OTel contexxt via Kafka headers
-type kafkaHeaderCarrier struct {
-	headers *[]kafka.Header
-}
-
-func (c kafkaHeaderCarrier) Get(key string) string {
-	for _, h := range *c.headers {
-		if h.Key == key {
-			return string(h.Value)
-		}
-	}
-	return ""
-}
-
-func (c kafkaHeaderCarrier) Set(key, value string) {
-	*c.headers = append(*c.headers, kafka.Header{Key: key, Value: []byte(value)})
-}
-
-func (c kafkaHeaderCarrier) Keys() []string {
-	keys := make([]string, len(*c.headers))
-	for i, h := range *c.headers {
-		keys[i] = h.Key
-	}
-	return keys
+	return err
 }

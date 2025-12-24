@@ -2,26 +2,16 @@ package services
 
 import (
 	"context"
-	"encoding/json"
-	"log"
-	"myesi-sbom-service-golang/internal/config"
-	"strings"
+	"fmt"
 	"time"
 
-	"github.com/segmentio/kafka-go"
+	"github.com/aarondl/sqlboiler/v4/boil"
 )
 
 const notificationTopic = "notification-events"
 
-// PublishScanSummary sends a project scan summary event to notification service.
-func PublishScanSummary(orgID int, project string, vulns int, codeFindings int, status string) {
-	cfg := config.LoadConfig()
-	writer := kafka.Writer{
-		Addr:  kafka.TCP(strings.Split(cfg.KafkaBroker, ",")...),
-		Topic: notificationTopic,
-	}
-	defer writer.Close()
-
+// QueueScanSummary sends a project scan summary event to notification service via the outbox.
+func QueueScanSummary(ctx context.Context, exec boil.ContextExecutor, orgID int, project string, vulns int, codeFindings int, status string) error {
 	payload := map[string]interface{}{
 		"project":       project,
 		"vulns":         vulns,
@@ -39,32 +29,16 @@ func PublishScanSummary(orgID int, project string, vulns int, codeFindings int, 
 		"occurred_at":     time.Now().UTC(),
 	}
 
-	data, err := json.Marshal(evt)
-	if err != nil {
-		log.Printf("[NOTIFY] marshal scan summary failed: %v", err)
-		return
-	}
-
-	msg := kafka.Message{
-		Key:   []byte(project),
-		Value: data,
-		Time:  time.Now().UTC(),
-	}
-
-	if err := writer.WriteMessages(context.Background(), msg); err != nil {
-		log.Printf("[NOTIFY] publish scan summary failed: %v", err)
-	}
+	return EnqueueOutboxEvent(ctx, exec, OutboxMessage{
+		Topic:     notificationTopic,
+		EventType: "project.scan.summary",
+		Key:       fmt.Sprintf("org-%d-scan-%s", orgID, project),
+		Payload:   evt,
+	})
 }
 
-// PublishManualSBOMSummary notifies about manual SBOM upload/scan.
-func PublishManualSBOMSummary(orgID int, project string, components int, vulns int, status string) {
-	cfg := config.LoadConfig()
-	writer := kafka.Writer{
-		Addr:  kafka.TCP(strings.Split(cfg.KafkaBroker, ",")...),
-		Topic: notificationTopic,
-	}
-	defer writer.Close()
-
+// QueueManualSBOMSummary notifies about manual SBOM upload/scan.
+func QueueManualSBOMSummary(ctx context.Context, exec boil.ContextExecutor, orgID int, project string, components int, vulns int, status string) error {
 	payload := map[string]interface{}{
 		"project":     project,
 		"components":  components,
@@ -82,19 +56,10 @@ func PublishManualSBOMSummary(orgID int, project string, components int, vulns i
 		"occurred_at":     time.Now().UTC(),
 	}
 
-	data, err := json.Marshal(evt)
-	if err != nil {
-		log.Printf("[NOTIFY] marshal sbom summary failed: %v", err)
-		return
-	}
-
-	msg := kafka.Message{
-		Key:   []byte(project),
-		Value: data,
-		Time:  time.Now().UTC(),
-	}
-
-	if err := writer.WriteMessages(context.Background(), msg); err != nil {
-		log.Printf("[NOTIFY] publish sbom summary failed: %v", err)
-	}
+	return EnqueueOutboxEvent(ctx, exec, OutboxMessage{
+		Topic:     notificationTopic,
+		EventType: "sbom.scan.summary",
+		Key:       fmt.Sprintf("org-%d-sbom-%s", orgID, project),
+		Payload:   evt,
+	})
 }

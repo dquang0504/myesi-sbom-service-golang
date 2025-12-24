@@ -3,9 +3,11 @@ package services
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
+	"path"
+	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -22,74 +24,93 @@ type S3Config struct {
 	SecretKey string
 }
 
-// UploadSBOMJSON uploads SBOM to S3. If S3 is unavailable or doesn't have configurations,
-// fallback to saving SBOM into database
-// Returns URL on S3 or DB identifier
-func UploadSBOMJSON(ctx context.Context, db *sql.DB, projectID int, projectName, manifestName string, sbomJSON []byte, summaryJSON []byte) (string, error) {
-	filename := fmt.Sprintf("sbom/%s.json", projectName)
-	objectURL := ""
-
-	// If S3_BUCKET isn't set, fallback to writing into DB
-	if os.Getenv("S3_BUCKET") != "" {
-		// Load AWS SDK v2 config
-		awsCfg, err := config.LoadDefaultConfig(ctx,
-			config.WithRegion("us-east-2"),
-			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-				os.Getenv("S3_ACCESS_KEY"),
-				os.Getenv("S3_SECRET_KEY"),
-				"",
-			)),
-		)
-
-		if err == nil {
-			// If a custom endpoint is available (e.g MinIO)
-			if ep := os.Getenv("S3_ENDPOINT"); ep != "" {
-				awsCfg.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(
-					func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-						return aws.Endpoint{
-							URL:           ep,
-							SigningRegion: awsCfg.Region,
-						}, nil
-					})
-			}
-
-			// Initialize S3 client
-			s3Client := s3.NewFromConfig(awsCfg)
-
-			//Upload SBOM to S3
-			_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
-				Bucket:      aws.String(os.Getenv("S3_BUCKET")),
-				Key:         aws.String(filename),
-				Body:        bytes.NewReader(sbomJSON),
-				ContentType: aws.String("application/json"),
-			})
-			if err == nil {
-				// Upload successful, save object URL
-				objectURL = fmt.Sprintf("https://%s.s3.amazonaws.com/%s", os.Getenv("S3_BUCKET"), filename)
-			}
-		}
+// UploadSBOMJSON uploads SBOM to S3 and returns the object URL if successful.
+// If S3 is not configured or upload fails, it returns an empty string without error
+// so the caller can fall back to storing SBOM data in Postgres.
+func UploadSBOMJSON(ctx context.Context, orgID, projectID int, projectName, manifestName string, sbomJSON []byte) (string, error) {
+	bucket := os.Getenv("S3_BUCKET")
+	if bucket == "" {
+		return "", nil
 	}
 
-	// Save SBOM to DB (fallback or with URL if S3 upload is successful)
-	id, _ := uuid.NewV4()
-	source := "db"
-	if objectURL != "" {
-		source = "s3"
-	}
-
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO sboms (
-			id, project_id, project_name, manifest_name, source, sbom, summary, object_url
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-	`, id, projectID, projectName, manifestName, source, sbomJSON, summaryJSON, objectURL)
+	key := buildSBOMObjectKey(orgID, projectID, manifestName)
+	awsCfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-east-2"),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			os.Getenv("S3_ACCESS_KEY"),
+			os.Getenv("S3_SECRET_KEY"),
+			"",
+		)),
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to save SBOM to DB: %w", err)
+		return "", nil
 	}
 
-	if objectURL != "" {
-		return objectURL, nil
+	if ep := os.Getenv("S3_ENDPOINT"); ep != "" {
+		awsCfg.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{
+					URL:           ep,
+					SigningRegion: awsCfg.Region,
+				}, nil
+			})
 	}
-	// Return DB id if S3 is unavailable
-	return fmt.Sprintf("db://%s", id.String()), nil
 
+	s3Client := s3.NewFromConfig(awsCfg)
+	_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(sbomJSON),
+		ContentType: aws.String("application/json"),
+	})
+	if err != nil {
+		return "", nil
+	}
+
+	return buildSBOMObjectURL(bucket, key), nil
+}
+
+func buildSBOMObjectKey(orgID, projectID int, manifestName string) string {
+	safeManifest := sanitizePathSegment(manifestName)
+	return path.Join(
+		"sbom",
+		fmt.Sprintf("org-%d", orgID),
+		fmt.Sprintf("project-%d", projectID),
+		safeManifest,
+		fmt.Sprintf("%d-%s.json", time.Now().UTC().UnixNano(), uuid.Must(uuid.NewV4()).String()),
+	)
+}
+
+func sanitizePathSegment(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	if s == "" {
+		s = "manifest"
+	}
+	replacer := strings.NewReplacer(
+		" ", "-",
+		"/", "-",
+		"\\", "-",
+		"..", "-",
+		"..", "-",
+		"__", "-",
+	)
+	s = replacer.Replace(s)
+	return strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') ||
+			(r >= '0' && r <= '9') ||
+			r == '-' || r == '_' || r == '.' {
+			return r
+		}
+		return '-'
+	}, s)
+}
+
+func buildSBOMObjectURL(bucket, key string) string {
+	if publicBase := strings.TrimSpace(os.Getenv("S3_PUBLIC_URL")); publicBase != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimRight(publicBase, "/"), key)
+	}
+	if ep := strings.TrimSpace(os.Getenv("S3_ENDPOINT")); ep != "" {
+		return fmt.Sprintf("%s/%s/%s", strings.TrimRight(ep, "/"), bucket, key)
+	}
+	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key)
 }
