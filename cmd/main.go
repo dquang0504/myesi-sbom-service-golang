@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	fiber "github.com/gofiber/fiber/v2"
 	fiberSwagger "github.com/gofiber/swagger"
@@ -26,6 +27,9 @@ func main() {
 	cfg := config.LoadConfig()
 	db.InitPostgres(cfg.DatabaseURL)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	app := fiber.New(fiber.Config{BodyLimit: 25 * 1024 * 1024})
 	api := app.Group("/api")
 
@@ -35,20 +39,41 @@ func main() {
 	projectsGroup := api.Group("/projects")
 	v1.RegisterProjectRoutes(projectsGroup)
 
-	go services.StartCodeScanConsumer()
+	services.StartCodeScanConsumer(ctx)
+	services.StartOutboxDispatcher(ctx)
 
 	app.Get("/swagger/*", fiberSwagger.HandlerDefault) // Swagger UI endpoint
 	log.Println("SBOM service listening on port 8002")
-	app.Listen(":8002")
 
-	//setup graceful shutdown
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	errCh := make(chan error, 1)
+	go func() {
+		if err := app.Listen(":8002"); err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- nil
+	}()
 
-	log.Println("[STARTUP] Vulnerability Service running...")
+	log.Println("[STARTUP] SBOM Service running...")
 
-	//wait until shutdown
-	<-ctx.Done()
+	select {
+	case <-ctx.Done():
+		log.Println("[SHUTDOWN] signal received, shutting down...")
+	case err := <-errCh:
+		if err != nil {
+			log.Printf("[SHUTDOWN] Fiber server error: %v", err)
+		}
+	}
 
-	log.Println("[EXIT] Vulnerability stopped gracefully")
+	_, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := app.Shutdown(); err != nil {
+		log.Printf("[SHUTDOWN][ERR] Fiber shutdown: %v", err)
+	}
+
+	db.CloseDB()
+	services.CloseKafkaWriters()
+
+	log.Println("[EXIT] SBOM Service stopped gracefully")
 }

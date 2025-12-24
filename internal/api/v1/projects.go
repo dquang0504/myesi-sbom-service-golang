@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"myesi-sbom-service-golang/internal/db"
+	"myesi-sbom-service-golang/internal/services"
 	"myesi-sbom-service-golang/models"
 	"sort"
 	"strconv"
@@ -217,11 +218,20 @@ func project_getOne(c *fiber.Ctx) error {
 // Create new project
 func project_create(c *fiber.Ctx) error {
 	var payload struct {
-		Name           string  `json:"name"`
-		Description    *string `json:"description"`
-		OwnerID        *int    `json:"owner_id"`
-		RepoURL        *string `json:"repo_url"`
-		OrganizationID int     `json:"organization_id"`
+		Name                string   `json:"name"`
+		Description         *string  `json:"description"`
+		OwnerID             *int     `json:"owner_id"`
+		RepoURL             *string  `json:"repo_url"`
+		OrganizationID      int      `json:"organization_id"`
+		GithubRepoID        *int64   `json:"github_repo_id"`
+		GithubFullName      *string  `json:"github_full_name"`
+		GithubVisibility    *string  `json:"github_visibility"`
+		GithubDefaultBranch *string  `json:"github_default_branch"`
+		GithubLanguage      []string `json:"github_language"`
+		StargazersCount     *int     `json:"stargazers_count"`
+		ForksCount          *int     `json:"forks_count"`
+		IsFork              *bool    `json:"is_fork"`
+		ImportStatus        *string  `json:"import_status"`
 	}
 	if err := c.BodyParser(&payload); err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid json payload")
@@ -239,15 +249,88 @@ func project_create(c *fiber.Ctx) error {
 		return fiber.NewError(fiber.StatusForbidden, "organization mismatch")
 	}
 
+	repoURL := ""
+	if payload.RepoURL != nil {
+		repoURL = strings.TrimSpace(*payload.RepoURL)
+	}
+	if repoURL == "" {
+		return fiber.NewError(fiber.StatusBadRequest, "repository url required")
+	}
+
+	now := time.Now()
 	p := &models.Project{
 		Name:           payload.Name,
 		Description:    null.StringFromPtr(payload.Description),
-		RepoURL:        null.StringFromPtr(payload.RepoURL),
-		CreatedAt:      null.TimeFrom(time.Now()),
-		OrganizationID: null.IntFrom(payload.OrganizationID),
+		RepoURL:        null.StringFrom(repoURL),
+		SourceType:     null.StringFrom("manual"),
+		CreatedAt:      null.TimeFrom(now),
+		OrganizationID: null.IntFrom(orgID),
 	}
 	if payload.OwnerID != nil {
 		p.OwnerID = null.IntFrom(*payload.OwnerID)
+	}
+
+	importStatus := "completed"
+	if payload.ImportStatus != nil && strings.TrimSpace(*payload.ImportStatus) != "" {
+		importStatus = strings.TrimSpace(*payload.ImportStatus)
+	}
+	p.ImportStatus = null.StringFrom(importStatus)
+
+	var metadata *services.GitHubRepoMetadata
+	var metadataErr error
+	if repoURL != "" {
+		metadata, metadataErr = services.FetchGitHubRepoMetadata(c.Context(), repoURL)
+		if metadataErr != nil {
+			p.LastSyncError = null.StringFrom(metadataErr.Error())
+		}
+	}
+
+	langs := make([]string, len(payload.GithubLanguage))
+	copy(langs, payload.GithubLanguage)
+	if metadata != nil && len(metadata.Languages) > 0 {
+		langs = metadata.Languages
+	}
+	if len(langs) > 0 {
+		if langJSON, err := json.Marshal(langs); err == nil {
+			p.GithubLanguage = null.JSONFrom(langJSON)
+		}
+	}
+
+	setStringField := func(target *null.String, value *string) {
+		if value != nil && strings.TrimSpace(*value) != "" {
+			*target = null.StringFrom(strings.TrimSpace(*value))
+		}
+	}
+
+	if metadata != nil {
+		p.GithubRepoID = null.Int64From(metadata.RepoID)
+		p.GithubFullName = null.StringFrom(metadata.FullName)
+		p.GithubVisibility = null.StringFrom(metadata.Visibility)
+		p.GithubDefaultBranch = null.StringFrom(metadata.DefaultBranch)
+		p.StargazersCount = null.IntFrom(metadata.Stargazers)
+		p.ForksCount = null.IntFrom(metadata.Forks)
+		p.IsFork = null.BoolFrom(metadata.IsFork)
+		p.GithubLastSync = null.TimeFrom(metadata.LastSyncedTime)
+	} else {
+		if payload.GithubRepoID != nil {
+			p.GithubRepoID = null.Int64From(*payload.GithubRepoID)
+		}
+		setStringField(&p.GithubFullName, payload.GithubFullName)
+		setStringField(&p.GithubVisibility, payload.GithubVisibility)
+		setStringField(&p.GithubDefaultBranch, payload.GithubDefaultBranch)
+		if payload.StargazersCount != nil {
+			p.StargazersCount = null.IntFrom(*payload.StargazersCount)
+		}
+		if payload.ForksCount != nil {
+			p.ForksCount = null.IntFrom(*payload.ForksCount)
+		}
+		if payload.IsFork != nil {
+			p.IsFork = null.BoolFrom(*payload.IsFork)
+		}
+	}
+
+	if metadata == nil && metadataErr == nil && len(langs) == 0 {
+		// nothing to sync but ensure SourceType remains manual
 	}
 
 	if err := p.Insert(c.Context(), db.Conn, boil.Infer()); err != nil {

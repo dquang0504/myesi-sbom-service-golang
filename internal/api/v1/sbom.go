@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -12,6 +11,11 @@ import (
 	"time"
 
 	fiber "github.com/gofiber/fiber/v2"
+)
+
+var (
+	listSBOMService = services.ListSBOM
+	getSBOMService  = services.GetSBOM
 )
 
 func RegisterSBOMRoutes(r fiber.Router) {
@@ -64,17 +68,14 @@ func uploadSBOM(c *fiber.Ctx) error {
 	// ---------------------------------------------------------
 	// 3. Check quota (consume trước, nhưng revert nếu fail)
 	// ---------------------------------------------------------
-	var allowed bool
-	var msg string
-	var periodEnd sql.NullTime
-
-	row := db.Conn.QueryRowContext(
+	allowed, msg, _, err := services.CheckAndConsumeUsage(
 		c.Context(),
-		"SELECT allowed, message, next_reset FROM check_and_consume_usage($1,$2,$3)",
-		orgID, "sbom_upload", 1,
+		db.Conn,
+		orgID,
+		"sbom_upload",
+		1,
 	)
-
-	if err := row.Scan(&allowed, &msg, &periodEnd); err != nil {
+	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "usage check failed: " + err.Error()})
 	}
 
@@ -82,23 +83,17 @@ func uploadSBOM(c *fiber.Ctx) error {
 		return c.Status(429).JSON(fiber.Map{"error": msg})
 	}
 
-	// ---------------------------------------------------------
-	// HELPER FUNCTION: revert usage safely
-	// ---------------------------------------------------------
-	revert := func() {
-		_, _ = db.Conn.ExecContext(
-			c.Context(),
-			"SELECT revert_usage($1,$2,$3)",
-			orgID, "sbom_upload", 1,
-		)
-	}
+	reserved := 1
+	successful := 0
+	defer func() {
+		services.ReleaseUnusedUsage(c.Context(), db.Conn, orgID, "sbom_upload", reserved, successful)
+	}()
 
 	// ---------------------------------------------------------
 	// 4. Validate manifest type
 	// ---------------------------------------------------------
 	manifestName := file.Filename
 	if !services.IsSupportedManifest(manifestName) {
-		revert()
 		return c.Status(400).JSON(fiber.Map{"error": "unsupported file type"})
 	}
 
@@ -107,14 +102,12 @@ func uploadSBOM(c *fiber.Ctx) error {
 	// ---------------------------------------------------------
 	f, err := file.Open()
 	if err != nil {
-		revert()
 		return c.Status(400).JSON(fiber.Map{"error": "cannot open file"})
 	}
 	defer f.Close()
 
 	content, err := io.ReadAll(f)
 	if err != nil {
-		revert()
 		return c.Status(500).JSON(fiber.Map{"error": "cannot read file"})
 	}
 
@@ -125,45 +118,74 @@ func uploadSBOM(c *fiber.Ctx) error {
 		c.Context(), projectName, manifestName, content,
 	)
 	if err != nil {
-		revert()
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	summaryJSON := []byte(`{}`)
-
 	// ---------------------------------------------------------
-	// 7. Upload JSON to S3 or DB
+	// 7. Upload JSON to S3 (optional)
 	// ---------------------------------------------------------
 	url, err := services.UploadSBOMJSON(
-		c.Context(), db.Conn,
-		projectID, projectName, manifestName,
-		sbomResult.Data, summaryJSON,
+		c.Context(),
+		orgID,
+		projectID,
+		projectName,
+		manifestName,
+		sbomResult.Data,
 	)
 	if err != nil {
-		revert()
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	components := services.ExtractComponents(sbomResult.Data)
+
+	tx, err := db.Conn.BeginTx(c.Context(), nil)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to start transaction"})
+	}
+	defer tx.Rollback()
 
 	// ---------------------------------------------------------
 	// 8. Insert/update SBOM in database
 	// ---------------------------------------------------------
 	id, _, err := services.UpsertSBOM(
-		context.Background(), db.Conn,
+		c.Context(), tx,
 		projectID, projectName, manifestName,
 		sbomResult.Data, "manual", url,
 	)
-
 	if err != nil {
-		revert()
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	// ---------------------------------------------------------
-	// 9. Extract components + publish event
-	// ---------------------------------------------------------
-	components := services.ExtractComponents(sbomResult.Data)
-	services.PublishSBOMEvent(id, projectName, projectID, orgID, components, "manual")
-	services.PublishManualSBOMSummary(orgID, projectName, len(components), 0, "completed")
+	if err := services.QueueSBOMEvent(
+		c.Context(),
+		tx,
+		id,
+		projectName,
+		projectID,
+		orgID,
+		components,
+		"manual",
+	); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to queue SBOM event"})
+	}
+
+	if err := services.QueueManualSBOMSummary(
+		c.Context(),
+		tx,
+		orgID,
+		projectName,
+		len(components),
+		0,
+		"completed",
+	); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to queue notification"})
+	}
+
+	if err := tx.Commit(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "failed to commit transaction"})
+	}
+
+	successful = 1
 
 	return c.JSON(fiber.Map{
 		"id":           id,
@@ -192,7 +214,7 @@ func listSBOMs(c *fiber.Ctx) error {
 	}
 	project := c.Query("project_name")
 	limit := c.QueryInt("limit", 50)
-	sboms, err := services.ListSBOM(c.Context(), db.Conn, project, limit, orgID)
+	sboms, err := listSBOMService(c.Context(), db.Conn, project, limit, orgID)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -218,7 +240,7 @@ func getSBOM(c *fiber.Ctx) error {
 	if err := ensureSBOMAccessible(c.Context(), id, orgID); err != nil {
 		return err
 	}
-	sbom, err := services.GetSBOM(c.Context(), db.Conn, id)
+	sbom, err := getSBOMService(c.Context(), db.Conn, id)
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "not found ád"})
 	}
